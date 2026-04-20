@@ -8,7 +8,8 @@ const PORT = process.env.PORT || 5000
 app.use(cors())
 app.use(express.json())
 
-// Test route
+app.use('/api/users', require('./routes/users'))
+
 app.get('/', (req, res) => {
   res.json({ message: 'Server is running!' })
 })
@@ -16,4 +17,3 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)
 })
-

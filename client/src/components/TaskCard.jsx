@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { supabase } from '../supabase'
 
 export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, onReviewSaved }) {
@@ -10,12 +10,6 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
   const [savingReview, setSavingReview] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-
-  useEffect(() => {
-    setReview(task.reviews?.[0] || null)
-    setScore(task.reviews?.[0]?.score || 0)
-    setNotes(task.reviews?.[0]?.notes || '')
-  }, [task.reviews])
 
   const toggleBreakdown = async (breakdown) => {
     const newChecked = !breakdown.is_checked

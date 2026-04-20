@@ -25,6 +25,18 @@ const fetchAreas = async () => {
   setAreas(data || [])
 }
 
+const handleDeleteUser = async (userId) => {
+  const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
+    method: 'DELETE'
+  })
+  const result = await response.json()
+  if (result.error) {
+    alert(result.error)
+  } else {
+    fetchUsers()
+  }
+}   
+
 useEffect(() => {
   const init = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -169,6 +181,22 @@ useEffect(() => {
                       >
                         Edit
                       </button>
+                      {user.role!='admin' && (
+                      <button
+                        onClick={() => {
+                            if (window.confirm(`Delete ${user.full_name}?`)) {
+                            handleDeleteUser(user.id)
+                            }
+                        }}
+                        style={{
+                            padding: '0.3rem 0.75rem', background: '#fee2e2',
+                            border: 'none', borderRadius: '6px',
+                            fontSize: '0.8rem', cursor: 'pointer', color: '#dc2626'
+                        }}
+                        >
+                        Delete
+                        </button>
+                        )}
                     </div>
                   </td>
                 </tr>
@@ -243,27 +271,34 @@ function UserModal({ editingUser, areas, onClose, onSaved }) {
       }
       onSaved()
       onClose()
-    } else {
-      if (!email || !password) { setError('Email and password required'); setLoading(false); return }
+} else {
+      console.log('creating user via server...')
+  if (!email || !password) { setError('Email and password required'); setLoading(false); return }
+  console.log('sending to localhost:5000...')
 
-      const { data, error: authError } = await supabase.auth.admin.createUser({
-        email, password, email_confirm: true
-      })
+  const response = await fetch('http://localhost:5000/api/users/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      password,
+      full_name: fullName,
+      role,
+      area_ids: selectedAreas
+    })
+  })
 
-      if (authError) { setError(authError.message); setLoading(false); return }
+  const result = await response.json()
 
-      await supabase.from('profiles').insert({
-        id: data.user.id, full_name: fullName, role
-      })
+  if (result.error) {
+    setError(result.error)
+    setLoading(false)
+    return
+  }
 
-      if (selectedAreas.length > 0) {
-        await supabase.from('user_areas').insert(
-          selectedAreas.map(area_id => ({ user_id: data.user.id, area_id }))
-        )
-      }
-      onSaved()
-      onClose()
-    }
+  onSaved()
+  onClose()
+}
     setLoading(false)
   }
 
