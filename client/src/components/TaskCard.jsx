@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 
-export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit }) {
+export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, onReviewSaved }) {
   const breakdowns = [...(task.breakdowns || [])].sort((a, b) => a.order_index - b.order_index)
   const [review, setReview] = useState(task.reviews?.[0] || null)
   const [showReview, setShowReview] = useState(false)
@@ -11,16 +11,20 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit }) 
   const [showMenu, setShowMenu] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  
+  useEffect(() => {
+    setReview(task.reviews?.[0] || null)
+    setScore(task.reviews?.[0]?.score || 0)
+    setNotes(task.reviews?.[0]?.notes || '')
+  }, [task.reviews])
 
   const toggleBreakdown = async (breakdown) => {
-  const newChecked = !breakdown.is_checked
-  onBreakdownToggle(task.id, breakdown.id, newChecked)
-  await supabase
-    .from('breakdowns')
-    .update({ is_checked: newChecked })
-    .eq('id', breakdown.id)
-}
+    const newChecked = !breakdown.is_checked
+    onBreakdownToggle(task.id, breakdown.id, newChecked)
+    await supabase
+      .from('breakdowns')
+      .update({ is_checked: newChecked })
+      .eq('id', breakdown.id)
+  }
 
   const handleDelete = async () => {
     await supabase.from('tasks').delete().eq('id', task.id)
@@ -32,12 +36,21 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit }) 
     const { data: { user } } = await supabase.auth.getUser()
     if (review) {
       const { data } = await supabase
-        .from('reviews').update({ score, notes }).eq('id', review.id).select().single()
+        .from('reviews')
+        .update({ score, notes })
+        .eq('id', review.id)
+        .select()
+        .single()
       setReview(data)
+      if (data) onReviewSaved(task.id, data)
     } else {
       const { data } = await supabase
-        .from('reviews').insert({ task_id: task.id, score, notes, reviewed_by: user.id }).select().single()
+        .from('reviews')
+        .insert({ task_id: task.id, score, notes, reviewed_by: user.id })
+        .select()
+        .single()
       setReview(data)
+      if (data) onReviewSaved(task.id, data)
     }
     setSavingReview(false)
     setShowReview(false)

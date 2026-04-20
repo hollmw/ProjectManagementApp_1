@@ -39,7 +39,7 @@ export default function Dashboard() {
   }, [])
 
   const handleTaskSaved = async () => {
-  const { data } = await supabase   
+  const { data } = await supabase
     .from('tasks')
     .select('*, areas(name, color), breakdowns(*), reviews(*)')
     .order('created_at', { ascending: false })
@@ -57,12 +57,14 @@ const handleEditTask = (task) => {
 
   useEffect(() => {
     const loadTasks = async () => {
-      const { data } = await supabase
-        .from('tasks')
-        .select('*, areas(name, color), breakdowns(*)')
-        .order('created_at', { ascending: false })
-      setTasks(data || [])
-    }
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*, areas(name, color), breakdowns(*), reviews(*)')
+    .order('created_at', { ascending: false })
+  console.log('tasks data:', data)
+  console.log('tasks error:', error)
+  setTasks(data || [])
+}
     loadTasks()
   }, [])
 
@@ -80,6 +82,13 @@ const handleEditTask = (task) => {
         b.id === breakdownId ? { ...b, is_checked: newChecked } : b
       )
     }
+  }))
+}
+
+const handleReviewSaved = (taskId, reviewData) => {
+  setTasks(prev => prev.map(task => {
+    if (task.id !== taskId) return task
+    return { ...task, reviews: [reviewData] }
   }))
 }
 
@@ -112,11 +121,12 @@ const handleEditTask = (task) => {
         <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.25rem' }}>WorkSpace</h2>
         <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '2rem' }}>Project Management</p>
 
+        {/* Business Areas label */}
         <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Business Areas
         </p>
 
-        {/* All areas button */}
+        {/* All */}
         <div
           onClick={() => setFilterArea('All')}
           style={{
@@ -131,6 +141,7 @@ const handleEditTask = (task) => {
           All
         </div>
 
+        {/* Area list */}
         {AREAS.map(area => (
           <div
             key={area.name}
@@ -154,6 +165,26 @@ const handleEditTask = (task) => {
           </div>
         ))}
 
+        {/* Admin section */}
+        <div style={{ marginTop: '1rem', borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
+          <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Admin
+          </p>
+          <div
+            onClick={() => navigate('/users')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.6rem',
+              padding: '0.5rem 0.75rem', borderRadius: '8px',
+              marginBottom: '0.25rem', cursor: 'pointer', fontSize: '0.9rem'
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            User Management
+          </div>
+        </div>
+
+        {/* Bottom user info */}
         <div style={{ marginTop: 'auto', borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
           <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>{profile.full_name}</div>
           <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.75rem' }}>{profile.role}</div>
@@ -242,7 +273,8 @@ const handleEditTask = (task) => {
   onBreakdownToggle={handleBreakdownToggle}
   onDelete={handleDeleteTask}
   onEdit={handleEditTask}
-/>            ))}
+  onReviewSaved={handleReviewSaved}
+/>         ))}
           </div>
         )}
       </div>
