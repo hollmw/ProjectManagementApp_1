@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../supabase'
 import { useNavigate } from 'react-router-dom'
 import NewTaskModal from '../components/NewTaskModal'
@@ -20,9 +20,8 @@ export default function Dashboard() {
   const [filterArea, setFilterArea] = useState('All')
   const [filterStatus, setFilterStatus] = useState('All')
   const [search, setSearch] = useState('')
-  const navigate = useNavigate()
   const [editingTask, setEditingTask] = useState(null)
-
+  const navigate = useNavigate()
 
   useEffect(() => {
     const getProfile = async () => {
@@ -38,33 +37,73 @@ export default function Dashboard() {
     getProfile()
   }, [])
 
-  const handleTaskSaved = async () => {
-  const { data } = await supabase
-    .from('tasks')
-    .select('*, areas(name, color), breakdowns(*), reviews(*), task_assignments(*, profiles!task_assignments_user_id_fkey(id, full_name, role))')    .order('created_at', { ascending: false })
-  setTasks(data || [])
-}
-  const handleDeleteTask = (taskId) => {
-  setTasks(prev => prev.filter(t => t.id !== taskId))
-}
+  const fetchTasks = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
 
-const handleEditTask = (task) => {
-  setEditingTask(task)
-  setShowModal(true)
-}
+    let query = supabase
+      .from('tasks')
+      .select('*, areas(name, color), breakdowns(*), reviews(*), task_assignments(*, profiles!task_assignments_user_id_fkey(id, full_name, role))')
+      .order('created_at', { ascending: false })
 
+    if (profileData?.role === 'intern') {
+      const { data: assignedTasks } = await supabase
+        .from('task_assignments')
+        .select('task_id')
+        .eq('user_id', user.id)
+      const taskIds = assignedTasks?.map(a => a.task_id) || []
+      if (taskIds.length === 0) { setTasks([]); return }
+      query = query.in('id', taskIds)
+    }
+
+    const { data } = await query
+    setTasks(data || [])
+  }, [])
 
   useEffect(() => {
-    const loadTasks = async () => {
-  const { data, error } = await supabase
-    .from('tasks')
-    .select('*, areas(name, color), breakdowns(*), reviews(*), task_assignments(*, profiles!task_assignments_user_id_fkey(id, full_name, role))')    .order('created_at', { ascending: false })
-  console.log('tasks data:', data)
-  console.log('tasks error:', error)
-  setTasks(data || [])
-}
-    loadTasks()
-  }, [])
+    fetchTasks()
+  }, [fetchTasks])
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`realtime-tasks-${profile.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
+        console.log('tasks changed:', payload)
+        fetchTasks()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'breakdowns' }, (payload) => {
+        console.log('breakdowns changed:', payload)
+        fetchTasks()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'task_assignments' }, (payload) => {
+        console.log('assignments changed:', payload)
+        fetchTasks()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, (payload) => {
+        console.log('reviews changed:', payload)
+        fetchTasks()
+      })
+      .subscribe((status) => {
+        console.log('realtime status:', status)
+      })
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [fetchTasks])
+
+  const handleDeleteTask = (taskId) => {
+    setTasks(prev => prev.filter(t => t.id !== taskId))
+  }
+
+  const handleEditTask = (task) => {
+    setEditingTask(task)
+    setShowModal(true)
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -72,31 +111,31 @@ const handleEditTask = (task) => {
   }
 
   const handleBreakdownToggle = (taskId, breakdownId, newChecked) => {
-  setTasks(prev => prev.map(task => {
-    if (task.id !== taskId) return task
-    return {
-      ...task,
-      breakdowns: task.breakdowns.map(b =>
-        b.id === breakdownId ? { ...b, is_checked: newChecked } : b
-      )
-    }
-  }))
-}
+    setTasks(prev => prev.map(task => {
+      if (task.id !== taskId) return task
+      return {
+        ...task,
+        breakdowns: task.breakdowns.map(b =>
+          b.id === breakdownId ? { ...b, is_checked: newChecked } : b
+        )
+      }
+    }))
+  }
 
-const handleReviewSaved = (taskId, reviewData) => {
-  setTasks(prev => prev.map(task => {
-    if (task.id !== taskId) return task
-    return { ...task, reviews: [reviewData] }
-  }))
-}
-const handleAssignmentChange = (taskId, newAssignments) => {
-  setTasks(prev => prev.map(task => {
-    if (task.id !== taskId) return task
-    return { ...task, task_assignments: newAssignments }
-  }))
-}
+  const handleReviewSaved = (taskId, reviewData) => {
+    setTasks(prev => prev.map(task => {
+      if (task.id !== taskId) return task
+      return { ...task, reviews: [reviewData] }
+    }))
+  }
 
-  // Filter logic
+  const handleAssignmentChange = (taskId, newAssignments) => {
+    setTasks(prev => prev.map(task => {
+      if (task.id !== taskId) return task
+      return { ...task, task_assignments: newAssignments }
+    }))
+  }
+
   const filteredTasks = tasks.filter(task => {
     const matchesArea = filterArea === 'All' || task.areas?.name === filterArea
     const totalBreakdowns = task.breakdowns?.length || 0
@@ -125,12 +164,10 @@ const handleAssignmentChange = (taskId, newAssignments) => {
         <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.25rem' }}>WorkSpace</h2>
         <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '2rem' }}>Project Management</p>
 
-        {/* Business Areas label */}
         <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Business Areas
         </p>
 
-        {/* All */}
         <div
           onClick={() => setFilterArea('All')}
           style={{
@@ -145,7 +182,6 @@ const handleAssignmentChange = (taskId, newAssignments) => {
           All
         </div>
 
-        {/* Area list */}
         {AREAS.map(area => (
           <div
             key={area.name}
@@ -169,26 +205,26 @@ const handleAssignmentChange = (taskId, newAssignments) => {
           </div>
         ))}
 
-        {/* Admin section */}
-        <div style={{ marginTop: '1rem', borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
-          <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Admin
-          </p>
-          <div
-            onClick={() => navigate('/users')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '0.6rem',
-              padding: '0.5rem 0.75rem', borderRadius: '8px',
-              marginBottom: '0.25rem', cursor: 'pointer', fontSize: '0.9rem'
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          >
-            User Management
+        {profile.role !== 'intern' && (
+          <div style={{ marginTop: '1rem', borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
+            <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Admin
+            </p>
+            <div
+              onClick={() => navigate('/users')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.6rem',
+                padding: '0.5rem 0.75rem', borderRadius: '8px',
+                marginBottom: '0.25rem', cursor: 'pointer', fontSize: '0.9rem'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              User Management
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Bottom user info */}
         <div style={{ marginTop: 'auto', borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
           <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>{profile.full_name}</div>
           <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.75rem' }}>{profile.role}</div>
@@ -204,28 +240,26 @@ const handleAssignmentChange = (taskId, newAssignments) => {
 
       {/* Main Content */}
       <div style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
-
-        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <div>
             <h1 style={{ fontSize: '1.4rem', fontWeight: 600 }}>Task Board</h1>
             <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>Welcome back, {profile.full_name}</p>
           </div>
-          <button onClick={() => setShowModal(true)} style={{
-            padding: '0.6rem 1.2rem', background: '#6366f1', color: 'white',
-            border: 'none', borderRadius: '8px', fontSize: '0.9rem',
-            fontWeight: 500, cursor: 'pointer'
-          }}>
-            + New Task
-          </button>
+          {profile.role !== 'intern' && (
+            <button onClick={() => setShowModal(true)} style={{
+              padding: '0.6rem 1.2rem', background: '#6366f1', color: 'white',
+              border: 'none', borderRadius: '8px', fontSize: '0.9rem',
+              fontWeight: 500, cursor: 'pointer'
+            }}>
+              + New Task
+            </button>
+          )}
         </div>
 
-        {/* Filter bar */}
         <div style={{
           display: 'flex', gap: '0.75rem', marginBottom: '1.5rem',
           alignItems: 'center', flexWrap: 'wrap'
         }}>
-          {/* Search */}
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -237,7 +271,6 @@ const handleAssignmentChange = (taskId, newAssignments) => {
             }}
           />
 
-          {/* Status filter */}
           {['All', 'Incomplete', 'Complete'].map(s => (
             <button
               key={s}
@@ -254,13 +287,11 @@ const handleAssignmentChange = (taskId, newAssignments) => {
             </button>
           ))}
 
-          {/* Result count */}
           <span style={{ fontSize: '0.8rem', color: '#9ca3af', marginLeft: 'auto' }}>
             {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''}
           </span>
         </div>
 
-        {/* Task Cards */}
         {filteredTasks.length === 0 ? (
           <div style={{
             background: 'white', borderRadius: '12px', padding: '2rem',
@@ -271,26 +302,28 @@ const handleAssignmentChange = (taskId, newAssignments) => {
         ) : (
           <div style={{ display: 'grid', gap: '1rem' }}>
             {filteredTasks.map(task => (
-<TaskCard
-  key={task.id}
-  task={task}
-  onBreakdownToggle={handleBreakdownToggle}
-  onDelete={handleDeleteTask}
-  onEdit={handleEditTask}
-  onReviewSaved={handleReviewSaved}
-  onAssignmentChange={handleAssignmentChange}
-/>       ))}
+              <TaskCard
+                key={task.id}
+                task={task}
+                onBreakdownToggle={handleBreakdownToggle}
+                onDelete={handleDeleteTask}
+                onEdit={handleEditTask}
+                onReviewSaved={handleReviewSaved}
+                onAssignmentChange={handleAssignmentChange}
+                userRole={profile.role}
+              />
+            ))}
           </div>
         )}
       </div>
 
       {showModal && (
-  <NewTaskModal
-    onClose={() => { setShowModal(false); setEditingTask(null) }}
-    onTaskCreated={handleTaskSaved}
-    editingTask={editingTask}
-  />
-)}
+        <NewTaskModal
+          onClose={() => { setShowModal(false); setEditingTask(null) }}
+          onTaskCreated={fetchTasks}
+          editingTask={editingTask}
+        />
+      )}
     </div>
   )
 }

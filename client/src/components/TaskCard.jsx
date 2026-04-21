@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 
-export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, onReviewSaved, onAssignmentChange }) {
-  const breakdowns = [...(task.breakdowns || [])].sort((a, b) => a.order_index - b.order_index)
+export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, onReviewSaved, onAssignmentChange, userRole }) {  const breakdowns = [...(task.breakdowns || [])].sort((a, b) => a.order_index - b.order_index)
   const [review, setReview] = useState(task.reviews?.[0] || null)
   const [showReview, setShowReview] = useState(false)
   const [score, setScore] = useState(task.reviews?.[0]?.score || 0)
@@ -137,6 +136,8 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
           </div>
 
           {/* Three dot menu */}
+          {userRole !== 'intern' && (
+
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowMenu(!showMenu)}
@@ -182,6 +183,7 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
               </div>
             )}
           </div>
+          )}
         </div>
       </div>
 
@@ -291,6 +293,7 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
               )}
             </div>
           </div>
+          {userRole !== 'intern' && (
           <button
             onClick={() => { setShowAssign(!showAssign); if (!showAssign) loadUsers() }}
             style={{
@@ -302,6 +305,7 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
           >
             {showAssign ? 'Close' : '+ Assign'}
           </button>
+          )}
         </div>
 
         {showAssign && (
