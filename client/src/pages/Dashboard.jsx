@@ -165,7 +165,7 @@ export default function Dashboard() {
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '2rem' }}>
           <img
-            src="/src/assets/logo.png"
+            src="/src/public/logo.png"
             alt="Logo"
             style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'contain', flexShrink: 0 }}
           />
