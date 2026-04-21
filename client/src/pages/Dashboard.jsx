@@ -41,8 +41,7 @@ export default function Dashboard() {
   const handleTaskSaved = async () => {
   const { data } = await supabase
     .from('tasks')
-    .select('*, areas(name, color), breakdowns(*), reviews(*)')
-    .order('created_at', { ascending: false })
+    .select('*, areas(name, color), breakdowns(*), reviews(*), task_assignments(*, profiles!task_assignments_user_id_fkey(id, full_name, role))')    .order('created_at', { ascending: false })
   setTasks(data || [])
 }
   const handleDeleteTask = (taskId) => {
@@ -59,8 +58,7 @@ const handleEditTask = (task) => {
     const loadTasks = async () => {
   const { data, error } = await supabase
     .from('tasks')
-    .select('*, areas(name, color), breakdowns(*), reviews(*)')
-    .order('created_at', { ascending: false })
+    .select('*, areas(name, color), breakdowns(*), reviews(*), task_assignments(*, profiles!task_assignments_user_id_fkey(id, full_name, role))')    .order('created_at', { ascending: false })
   console.log('tasks data:', data)
   console.log('tasks error:', error)
   setTasks(data || [])
@@ -89,6 +87,12 @@ const handleReviewSaved = (taskId, reviewData) => {
   setTasks(prev => prev.map(task => {
     if (task.id !== taskId) return task
     return { ...task, reviews: [reviewData] }
+  }))
+}
+const handleAssignmentChange = (taskId, newAssignments) => {
+  setTasks(prev => prev.map(task => {
+    if (task.id !== taskId) return task
+    return { ...task, task_assignments: newAssignments }
   }))
 }
 
@@ -274,7 +278,8 @@ const handleReviewSaved = (taskId, reviewData) => {
   onDelete={handleDeleteTask}
   onEdit={handleEditTask}
   onReviewSaved={handleReviewSaved}
-/>         ))}
+  onAssignmentChange={handleAssignmentChange}
+/>       ))}
           </div>
         )}
       </div>

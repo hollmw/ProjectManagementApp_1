@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 
-export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, onReviewSaved }) {
+export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, onReviewSaved, onAssignmentChange }) {
   const breakdowns = [...(task.breakdowns || [])].sort((a, b) => a.order_index - b.order_index)
   const [review, setReview] = useState(task.reviews?.[0] || null)
   const [showReview, setShowReview] = useState(false)
@@ -10,6 +10,19 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
   const [savingReview, setSavingReview] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [showAssign, setShowAssign] = useState(false)
+  const [users, setUsers] = useState([])
+  const [assignments, setAssignments] = useState(task.task_assignments || [])
+
+  useEffect(() => {
+    setReview(task.reviews?.[0] || null)
+    setScore(task.reviews?.[0]?.score || 0)
+    setNotes(task.reviews?.[0]?.notes || '')
+  }, [task.reviews])
+
+  useEffect(() => {
+    setAssignments(task.task_assignments || [])
+  }, [task.task_assignments])
 
   const toggleBreakdown = async (breakdown) => {
     const newChecked = !breakdown.is_checked
@@ -49,6 +62,35 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
     setSavingReview(false)
     setShowReview(false)
   }
+
+  const loadUsers = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, full_name, role')
+    setUsers(data || [])
+  }
+
+  const toggleAssignment = async (user) => {
+  const existing = assignments.find(a => a.profiles?.id === user.id || a.user_id === user.id)
+  if (existing) {
+    await supabase.from('task_assignments').delete().eq('id', existing.id)
+    const newAssignments = assignments.filter(a => a.id !== existing.id)
+    setAssignments(newAssignments)
+    onAssignmentChange(task.id, newAssignments)
+  } else {
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    const { data } = await supabase
+      .from('task_assignments')
+      .insert({ task_id: task.id, user_id: user.id, assigned_by: currentUser.id })
+      .select('*, profiles!task_assignments_user_id_fkey(id, full_name, role)')
+      .single()
+    if (data) {
+      const newAssignments = [...assignments, data]
+      setAssignments(newAssignments)
+      onAssignmentChange(task.id, newAssignments)
+    }
+  }
+}
 
   const checkedCount = breakdowns.filter(b => b.is_checked).length
   const totalCount = breakdowns.length
@@ -227,6 +269,76 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
         </div>
       )}
 
+      {/* Assignment section */}
+      <div style={{ marginTop: '1rem', borderTop: '1px solid #f3f4f6', paddingTop: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase' }}>Assigned</span>
+            <div style={{ display: 'flex' }}>
+            {assignments.filter(a => a?.profiles).slice(0, 4).map((a, i) => (
+              <UserAvatar key={a.id} profile={a.profiles} index={i} total={assignments.length} />
+            ))}
+              {assignments.length > 4 && (
+                <div style={{
+                  width: '24px', height: '24px', borderRadius: '50%',
+                  background: '#e5e7eb', color: '#6b7280',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '0.65rem', fontWeight: 600,
+                  border: '2px solid white', marginLeft: '-6px'
+                }}>
+                  +{assignments.length - 4}
+                </div>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => { setShowAssign(!showAssign); if (!showAssign) loadUsers() }}
+            style={{
+              fontSize: '0.8rem', padding: '0.3rem 0.75rem',
+              background: showAssign ? '#f3f4f6' : '#6366f1',
+              color: showAssign ? '#6b7280' : 'white',
+              border: 'none', borderRadius: '6px', cursor: 'pointer'
+            }}
+          >
+            {showAssign ? 'Close' : '+ Assign'}
+          </button>
+        </div>
+
+        {showAssign && (
+          <div style={{ marginTop: '0.75rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            {users.map(user => {
+              const isAssigned = assignments.some(a => a.profiles?.id === user.id || a.user_id === user.id)
+              return (
+                <div
+                  key={user.id}
+                  onClick={() => toggleAssignment(user)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    padding: '0.4rem 0.75rem', borderRadius: '20px',
+                    cursor: 'pointer', fontSize: '0.85rem',
+                    border: `2px solid ${isAssigned ? '#6366f1' : '#e5e7eb'}`,
+                    background: isAssigned ? '#eef2ff' : 'white',
+                    color: isAssigned ? '#6366f1' : '#6b7280',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  <div style={{
+                    width: '20px', height: '20px', borderRadius: '50%',
+                    background: isAssigned ? '#6366f1' : '#e5e7eb',
+                    color: isAssigned ? 'white' : '#6b7280',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '0.65rem', fontWeight: 600, flexShrink: 0
+                  }}>
+                    {user.full_name?.charAt(0).toUpperCase() || '?'}
+                  </div>
+                  {user.full_name}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Review section */}
       <div style={{ marginTop: '1rem', borderTop: '1px solid #f3f4f6', paddingTop: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -328,6 +440,145 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function UserAvatar({ profile, index, total }) {
+  const [hover, setHover] = useState(false)
+  const [workload, setWorkload] = useState(null)
+
+  const [lastFetched, setLastFetched] = useState(null)
+
+  const loadWorkload = async () => {
+  const now = Date.now()
+  if (lastFetched && now - lastFetched < 3000) return
+  const { data } = await supabase
+    .from('task_assignments')
+    .select('tasks(id, title, area_id, areas(name, color), breakdowns(*))')
+    .eq('user_id', profile.id)
+  
+  // Filter out fully completed tasks
+  const incomplete = (data || []).filter(a => {
+    const task = a.tasks
+    if (!task) return false
+    const total = task.breakdowns?.length || 0
+    const checked = task.breakdowns?.filter(b => b.is_checked).length || 0
+    if (total === 0) return true
+    return checked < total
+  })
+
+  setWorkload(incomplete)
+  setLastFetched(now)
+}
+
+  return (
+    <div
+      style={{ position: 'relative', marginLeft: index > 0 ? '-6px' : '0', zIndex: total - index }}
+      onMouseEnter={() => { setHover(true); loadWorkload() }}
+      onMouseLeave={() => setHover(false)}
+    >
+      {/* Avatar circle */}
+      <div style={{
+        width: '24px', height: '24px', borderRadius: '50%',
+        background: '#6366f1', color: 'white',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '0.7rem', fontWeight: 600,
+        border: '2px solid white', cursor: 'pointer'
+      }}>
+        {profile?.full_name?.charAt(0).toUpperCase() || '?'}
+      </div>
+
+      {/* Hover pill */}
+      {hover && (
+        <div style={{
+          position: 'absolute', bottom: '130%', left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'white', border: '1px solid #e5e7eb',
+          borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          padding: '0.75rem', minWidth: '220px', maxWidth: '280px',
+          zIndex: 999
+        }}>
+          {/* Arrow */}
+          <div style={{
+            position: 'absolute', top: '100%', left: '50%',
+            transform: 'translateX(-50%)',
+            width: 0, height: 0,
+            borderLeft: '6px solid transparent',
+            borderRight: '6px solid transparent',
+            borderTop: '6px solid white'
+          }} />
+
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <div style={{
+              width: '28px', height: '28px', borderRadius: '50%',
+              background: '#6366f1', color: 'white',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '0.75rem', fontWeight: 600, flexShrink: 0
+            }}>
+              {profile?.full_name?.charAt(0).toUpperCase() || '?'}
+            </div>
+            <div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#111827' }}>{profile?.full_name}</div>
+              <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>{workload ? `${workload.length} task${workload.length !== 1 ? 's' : ''}` : 'Loading...'}</div>
+            </div>
+          </div>
+
+          {/* Task list */}
+          {!workload ? (
+            <div style={{ fontSize: '0.8rem', color: '#9ca3af', textAlign: 'center', padding: '0.5rem' }}>Loading...</div>
+          ) : workload.length === 0 ? (
+            <div style={{ fontSize: '0.8rem', color: '#9ca3af', textAlign: 'center', padding: '0.5rem' }}>No tasks assigned</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {workload.map(a => {
+                const task = a.tasks
+                if (!task) return null
+                const total = task.breakdowns?.length || 0
+                const checked = task.breakdowns?.filter(b => b.is_checked).length || 0
+                const percent = total > 0 ? Math.round((checked / total) * 100) : 0
+                const color = task.areas?.color || '#6366f1'
+
+                return (
+                  <div key={task.id} style={{
+                    padding: '0.5rem 0.6rem',
+                    background: '#f9fafb',
+                    borderRadius: '8px',
+                    borderLeft: `3px solid ${color}`
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#111827' }}>{task.title}</span>
+                      <span style={{
+                        fontSize: '0.7rem', padding: '0.1rem 0.4rem',
+                        background: color + '20', color: color,
+                        borderRadius: '10px', fontWeight: 600, flexShrink: 0
+                      }}>
+                        {task.areas?.name}
+                      </span>
+                    </div>
+                    {total > 0 && (
+                      <div>
+                        <div style={{ height: '4px', background: '#e5e7eb', borderRadius: '2px', overflow: 'hidden' }}>
+                          <div style={{
+                            height: '100%', borderRadius: '2px',
+                            background: percent === 100 ? '#10b981' : color,
+                            width: `${percent}%`,
+                            transition: 'width 0.3s'
+                          }} />
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: '0.2rem' }}>
+                          {percent}% complete
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

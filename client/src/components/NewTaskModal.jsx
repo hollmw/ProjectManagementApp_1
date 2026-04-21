@@ -7,7 +7,7 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
   const [areaId, setAreaId] = useState(editingTask?.area_id || '')
   const [dueDate, setDueDate] = useState(editingTask?.due_date || '')
   const [breakdowns, setBreakdowns] = useState(
-    editingTask?.breakdowns?.map(b => b.title) || ['']
+    editingTask?.breakdowns?.map(b => ({ title: b.title, is_checked: b.is_checked })) || [{ title: '', is_checked: false }]
   )
   const [areas, setAreas] = useState([])
   const [loading, setLoading] = useState(false)
@@ -20,11 +20,11 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
     fetchAreas()
   }, [])
 
-  const addBreakdown = () => setBreakdowns([...breakdowns, ''])
+  const addBreakdown = () => setBreakdowns([...breakdowns, { title: '', is_checked: false }])
 
   const updateBreakdown = (index, value) => {
     const updated = [...breakdowns]
-    updated[index] = value
+    updated[index] = { ...updated[index], title: value }
     setBreakdowns(updated)
   }
 
@@ -39,28 +39,28 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (editingTask) {
-  await supabase
-    .from('tasks')
-    .update({ title, description, area_id: areaId, due_date: dueDate || null })
-    .eq('id', editingTask.id)
+      await supabase
+        .from('tasks')
+        .update({ title, description, area_id: areaId, due_date: dueDate || null })
+        .eq('id', editingTask.id)
 
-  // Wait for delete to fully complete before inserting
-  await supabase
-    .from('breakdowns')
-    .delete()
-    .eq('task_id', editingTask.id)
+      await supabase
+        .from('breakdowns')
+        .delete()
+        .eq('task_id', editingTask.id)
 
-  const validBreakdowns = breakdowns.filter(b => b.trim() !== '')
-  if (validBreakdowns.length > 0) {
-    await supabase.from('breakdowns').insert(
-      validBreakdowns.map((title, index) => ({
-        task_id: editingTask.id,
-        title,
-        order_index: index
-      }))
-    )
-  }
-} else {
+      const validBreakdowns = breakdowns.filter(b => b.title.trim() !== '')
+      if (validBreakdowns.length > 0) {
+        await supabase.from('breakdowns').insert(
+          validBreakdowns.map((b, index) => ({
+            task_id: editingTask.id,
+            title: b.title,
+            is_checked: b.is_checked,
+            order_index: index
+          }))
+        )
+      }
+    } else {
       const { data: task, error } = await supabase
         .from('tasks')
         .insert({ title, description, area_id: areaId, due_date: dueDate || null, created_by: user.id })
@@ -68,11 +68,14 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
         .single()
 
       if (!error && task) {
-        const validBreakdowns = breakdowns.filter(b => b.trim() !== '')
+        const validBreakdowns = breakdowns.filter(b => b.title.trim() !== '')
         if (validBreakdowns.length > 0) {
           await supabase.from('breakdowns').insert(
-            validBreakdowns.map((title, index) => ({
-              task_id: task.id, title, order_index: index
+            validBreakdowns.map((b, index) => ({
+              task_id: task.id,
+              title: b.title,
+              is_checked: false,
+              order_index: index
             }))
           )
         }
@@ -127,7 +130,7 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.4rem' }}>Breakdown Steps</label>
         {breakdowns.map((b, i) => (
           <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            <input value={b} onChange={e => updateBreakdown(i, e.target.value)}
+            <input value={b.title} onChange={e => updateBreakdown(i, e.target.value)}
               placeholder={`Step ${i + 1}`}
               style={{ flex: 1, padding: '0.6rem 0.75rem', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '0.9rem' }} />
             {breakdowns.length > 1 && (
