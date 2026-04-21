@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
+import { logActivity } from '../utils/logActivity'
 
 export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, onReviewSaved, onAssignmentChange, userRole }) {  const breakdowns = [...(task.breakdowns || [])].sort((a, b) => a.order_index - b.order_index)
   const [review, setReview] = useState(task.reviews?.[0] || null)
@@ -12,6 +13,7 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
   const [showAssign, setShowAssign] = useState(false)
   const [users, setUsers] = useState([])
   const [assignments, setAssignments] = useState(task.task_assignments || [])
+  
 
   useEffect(() => {
     setReview(task.reviews?.[0] || null)
@@ -24,13 +26,42 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
   }, [task.task_assignments])
 
   const toggleBreakdown = async (breakdown) => {
-    const newChecked = !breakdown.is_checked
-    onBreakdownToggle(task.id, breakdown.id, newChecked)
-    await supabase
-      .from('breakdowns')
-      .update({ is_checked: newChecked })
-      .eq('id', breakdown.id)
+  const newChecked = !breakdown.is_checked
+  onBreakdownToggle(task.id, breakdown.id, newChecked)
+  await supabase
+    .from('breakdowns')
+    .update({ is_checked: newChecked })
+    .eq('id', breakdown.id)
+
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (newChecked) {
+    // Check if points already awarded for this breakdown
+    const { data: existing } = await supabase
+      .from('activity_log')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('task_id', task.id)
+      .ilike('action', `%${breakdown.title}%`)
+      .limit(1)
+
+    const alreadyAwarded = existing && existing.length > 0
+
+    await logActivity(
+      user.id,
+      `Completed step "${breakdown.title}" on task "${task.title}"`,
+      task.id,
+      alreadyAwarded ? 0 : 10  // only award points first time
+    )
+  } else {
+    await logActivity(
+      user.id,
+      `Unchecked step "${breakdown.title}" on task "${task.title}"`,
+      task.id,
+      0
+    )
   }
+}
 
   const handleDelete = async () => {
     await supabase.from('tasks').delete().eq('id', task.id)
@@ -40,6 +71,7 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
   const saveReview = async () => {
     setSavingReview(true)
     const { data: { user } } = await supabase.auth.getUser()
+    await logActivity(user.id, `Reviewed task "${task.title}" — scored ${score}/10`, task.id, 5)
     if (review) {
       const { data } = await supabase
         .from('reviews')

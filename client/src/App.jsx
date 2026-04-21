@@ -2,6 +2,8 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import UserManagement from './pages/UserManagement'
+import ActivityLog from './pages/ActivityLog'
+
 
 function App() {
   return (
@@ -10,6 +12,8 @@ function App() {
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/users" element={<UserManagement />} />
       <Route path="*" element={<Navigate to="/login" />} />
+      <Route path="/activity" element={<ActivityLog />} />
+
     </Routes>
   )
 }

@@ -70,7 +70,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const channel = supabase
-      .channel(`realtime-tasks-${profile.id}`)
+      .channel(`realtime-tasks-${profile?.id || 'guest'}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
         console.log('tasks changed:', payload)
         fetchTasks()
@@ -221,6 +221,18 @@ export default function Dashboard() {
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
               User Management
+            </div>
+            <div
+              onClick={() => navigate('/activity')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.6rem',
+                padding: '0.5rem 0.75rem', borderRadius: '8px',
+                marginBottom: '0.25rem', cursor: 'pointer', fontSize: '0.9rem'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              Activity Log
             </div>
           </div>
         )}
