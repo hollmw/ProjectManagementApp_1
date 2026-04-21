@@ -170,7 +170,7 @@ export default function Dashboard() {
             style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'contain', flexShrink: 0 }}
           />
           <div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#111827' }}>WorkSpace</div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#111827' }}>Work Space</div>
             <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>Project Management</div>
           </div>
         </div>
