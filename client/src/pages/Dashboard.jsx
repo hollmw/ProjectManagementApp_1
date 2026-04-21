@@ -214,33 +214,52 @@ export default function Dashboard() {
           />
         ))}
 
-        {/* Admin section */}
-        {profile.role !== 'intern' && (
-          <div style={{ marginTop: '1rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
-            <p style={{ fontSize: '0.7rem', fontWeight: 600, color: '#9ca3af', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Admin
-            </p>
-            {[
-              { label: 'User Management', path: '/users' },
-              { label: 'Activity Log', path: '/activity' },
-              { label: 'Leaderboard', path: '/leaderboard' },
-            ].map(item => (
-              <div
-                key={item.path}
-                onClick={() => navigate(item.path)}
-                style={{
-                  padding: '0.45rem 0.75rem', borderRadius: '8px',
-                  marginBottom: '0.2rem', cursor: 'pointer', fontSize: '0.875rem',
-                  transition: 'background 0.15s'
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              >
-                {item.label}
-              </div>
-            ))}
-          </div>
-        )}
+{/* Visible to all */}
+{[
+  { label: '🏆 Leaderboard', path: '/leaderboard' },
+  { label: '📅 Gantt Chart', path: '/gantt' },
+].map(item => (
+  <div
+    key={item.path}
+    onClick={() => navigate(item.path)}
+    style={{
+      padding: '0.45rem 0.75rem', borderRadius: '8px',
+      marginBottom: '0.2rem', cursor: 'pointer', fontSize: '0.875rem',
+      transition: 'background 0.15s'
+    }}
+    onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
+    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+  >
+    {item.label}
+  </div>
+))}
+
+{/* Admin only */}
+{profile.role !== 'intern' && (
+  <div style={{ marginTop: '1rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
+    <p style={{ fontSize: '0.7rem', fontWeight: 600, color: '#9ca3af', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+      Admin
+    </p>
+    {[
+      { label: 'User Management', path: '/users' },
+      { label: 'Activity Log', path: '/activity' },
+    ].map(item => (
+      <div
+        key={item.path}
+        onClick={() => navigate(item.path)}
+        style={{
+          padding: '0.45rem 0.75rem', borderRadius: '8px',
+          marginBottom: '0.2rem', cursor: 'pointer', fontSize: '0.875rem',
+          transition: 'background 0.15s'
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
+        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+      >
+        {item.label}
+      </div>
+    ))}
+  </div>
+)}
 
         {/* User info */}
         <div style={{ marginTop: 'auto', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>

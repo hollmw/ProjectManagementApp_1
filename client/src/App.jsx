@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import UserManagement from './pages/UserManagement'
 import ActivityLog from './pages/ActivityLog'
 import Leaderboard from './pages/Leaderboard'
+import GanttChart from './pages/GanttChart'
 
 
 
@@ -16,6 +17,8 @@ function App() {
       <Route path="*" element={<Navigate to="/login" />} />
       <Route path="/activity" element={<ActivityLog />} />
       <Route path="/leaderboard" element={<Leaderboard />} />
+      <Route path="/gantt" element={<GanttChart />} />
+
 
 
     </Routes>

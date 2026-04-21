@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { useNavigate } from 'react-router-dom'
 
+
 const BADGES = {
   first_task: { label: 'First Step', icon: '🌱', desc: 'Completed first breakdown', color: '#10b981' },
   ten_tasks: { label: 'Getting Going', icon: '⚡', desc: '10 breakdowns completed', color: '#f59e0b' },
@@ -16,15 +17,7 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(true)
   const [selectedUser, setSelectedUser] = useState(null)
   const navigate = useNavigate()
-
-  useEffect(() => {
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { navigate('/login'); return }
-      await fetchLeaderboard()
-    }
-    init()
-  }, [])
+  const [profile, setProfile] = useState(null)
 
   const fetchLeaderboard = async () => {
     const { data: profiles } = await supabase
@@ -47,6 +40,23 @@ export default function Leaderboard() {
     setBadges(badgeMap)
     setLoading(false)
   }
+
+    useEffect(() => {
+  const init = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { navigate('/login'); return }
+
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    setProfile(profileData)
+    await fetchLeaderboard()
+  }
+  init()
+}, [])
 
   const getRankStyle = (index) => {
     if (index === 0) return { bg: 'linear-gradient(135deg, #fef3c7, #fde68a)', border: '#f59e0b', icon: '🥇' }
@@ -85,10 +95,9 @@ export default function Leaderboard() {
         </div>
 
         {[
-          { label: 'Task Board', path: '/dashboard' },
-          { label: 'User Management', path: '/users' },
-          { label: 'Activity Log', path: '/activity' },
-          { label: 'Leaderboard', path: '/leaderboard', active: true },
+          { label: '📋 Task Board', path: '/dashboard' },
+          { label: '🏆 Leaderboard', path: '/leaderboard', active: true },
+          { label: '📅 Gantt Chart', path: '/gantt' },
         ].map(item => (
           <div
             key={item.path}
@@ -102,6 +111,25 @@ export default function Leaderboard() {
             }}
             onMouseEnter={e => { if (!item.active) e.currentTarget.style.background = '#f3f4f6' }}
             onMouseLeave={e => { if (!item.active) e.currentTarget.style.background = 'transparent' }}
+          >
+            {item.label}
+          </div>
+        ))}
+
+        {profile?.role !== 'intern' && [
+          { label: '👥 User Management', path: '/users' },
+          { label: '📊 Activity Log', path: '/activity' },
+        ].map(item => (
+          <div
+            key={item.path}
+            onClick={() => navigate(item.path)}
+            style={{
+              padding: '0.5rem 0.75rem', borderRadius: '8px',
+              marginBottom: '0.2rem', cursor: 'pointer', fontSize: '0.875rem',
+              background: 'transparent', color: '#374151'
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
             {item.label}
           </div>
