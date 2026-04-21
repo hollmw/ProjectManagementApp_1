@@ -135,11 +135,22 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
 
   return (
     <div style={{
-      background: 'white', borderRadius: '12px',
-      padding: '1.5rem', border: '1px solid #e5e7eb',
+      background: 'white', borderRadius: '14px',
+      padding: '1.25rem 1.5rem', border: '1px solid #f1f5f9',
       borderLeft: `4px solid ${task.areas?.color || '#6366f1'}`,
-      position: 'relative'
-    }}>
+      position: 'relative',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)',
+      transition: 'box-shadow 0.2s, transform 0.2s'
+    }}
+      onMouseEnter={e => {
+        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'
+        e.currentTarget.style.transform = 'translateY(-1px)'
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)'
+        e.currentTarget.style.transform = 'translateY(0)'
+      }}
+    >
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
         <div>
