@@ -12,11 +12,22 @@ export default function UserManagement() {
 
 
   const fetchUsers = async () => {
-  const { data } = await supabase
+  const { data: profiles } = await supabase
     .from('profiles')
     .select('*, user_areas(area_id, areas(name, color))')
     .order('created_at', { ascending: false })
-  setUsers(data || [])
+
+  // Get emails from auth.users
+  const { data: authUsers } = await supabase
+    .from('profiles')
+    .select('id, email')
+
+  const usersWithEmail = (profiles || []).map(p => ({
+    ...p,
+    email: p.email || authUsers?.find(u => u.id === p.id)?.email
+  }))
+
+  setUsers(usersWithEmail)
   setLoading(false)
 }
 
@@ -126,6 +137,7 @@ useEffect(() => {
               <tr style={{ borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
                 <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>User</th>
                 <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Role</th>
+                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Email</th>
                 <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Area</th>
                 <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Points</th>
                 <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Actions</th>
@@ -146,6 +158,7 @@ useEffect(() => {
                       </div>
                       <div>
                         <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>{user.full_name || 'Unnamed'}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{user.email || '—'}</div>
                       </div>
                     </div>
                   </td>
