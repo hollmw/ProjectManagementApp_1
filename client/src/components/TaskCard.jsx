@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { logActivity, awardPerfectReviewBadge} from '../utils/logActivity'
+import UserPill from './UserPill'
+
 
 export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, onReviewSaved, onAssignmentChange, userRole }) {  const breakdowns = [...(task.breakdowns || [])].sort((a, b) => a.order_index - b.order_index)
   const [review, setReview] = useState(task.reviews?.[0] || null)
@@ -359,30 +361,13 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
             {users.map(user => {
               const isAssigned = assignments.some(a => a.profiles?.id === user.id || a.user_id === user.id)
               return (
-                <div
+                <UserPill
                   key={user.id}
+                  user={user}
+                  isAssigned={isAssigned}
                   onClick={() => toggleAssignment(user)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '0.4rem',
-                    padding: '0.4rem 0.75rem', borderRadius: '20px',
-                    cursor: 'pointer', fontSize: '0.85rem',
-                    border: `2px solid ${isAssigned ? '#6366f1' : '#e5e7eb'}`,
-                    background: isAssigned ? '#eef2ff' : 'white',
-                    color: isAssigned ? '#6366f1' : '#6b7280',
-                    transition: 'all 0.15s'
-                  }}
-                >
-                  <div style={{
-                    width: '20px', height: '20px', borderRadius: '50%',
-                    background: isAssigned ? '#6366f1' : '#e5e7eb',
-                    color: isAssigned ? 'white' : '#6b7280',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '0.65rem', fontWeight: 600, flexShrink: 0
-                  }}>
-                    {user.full_name?.charAt(0).toUpperCase() || '?'}
-                  </div>
-                  {user.full_name}
-                </div>
+                  showAssignState={true}
+                />
               )
             })}
           </div>
