@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef} from 'react'
 import { supabase } from '../supabase'
 import { useNavigate } from 'react-router-dom'
 import NewTaskModal from '../components/NewTaskModal'
@@ -14,6 +14,7 @@ const AREAS = [
 ]
 
 export default function Dashboard() {
+  const [areaUsers, setAreaUsers] = useState({})
   const [profile, setProfile] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [tasks, setTasks] = useState([])
@@ -149,6 +150,28 @@ export default function Dashboard() {
     return matchesArea && matchesStatus && matchesSearch
   })
 
+  const fetchAreaUsers = async (areaName) => {
+  if (areaUsers[areaName]) return
+
+  // First get the area id
+  const { data: areaData } = await supabase
+    .from('areas')
+    .select('id')
+    .eq('name', areaName)
+    .single()
+
+  if (!areaData) return
+
+  // Then get users in that area
+  const { data } = await supabase
+    .from('user_areas')
+    .select('profiles(id, full_name, role)')
+    .eq('area_id', areaData.id)
+
+  const users = (data || []).map(d => d.profiles).filter(Boolean)
+  setAreaUsers(prev => ({ ...prev, [areaName]: users }))
+}
+
   if (!profile) return <div style={{ padding: '2rem' }}>Loading...</div>
 
   return (
@@ -183,26 +206,15 @@ export default function Dashboard() {
         </div>
 
         {AREAS.map(area => (
-          <div
+          <AreaSidebarItem
             key={area.name}
+            area={area}
+            count={tasks.filter(t => t.areas?.name === area.name).length}
+            isSelected={filterArea === area.name}
             onClick={() => setFilterArea(area.name)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '0.6rem',
-              padding: '0.5rem 0.75rem', borderRadius: '8px',
-              marginBottom: '0.25rem', cursor: 'pointer', fontSize: '0.9rem',
-              background: filterArea === area.name ? area.color + '15' : 'transparent',
-              fontWeight: filterArea === area.name ? 600 : 400,
-              color: filterArea === area.name ? area.color : 'inherit'
-            }}
-            onMouseEnter={e => { if (filterArea !== area.name) e.currentTarget.style.background = '#f3f4f6' }}
-            onMouseLeave={e => { if (filterArea !== area.name) e.currentTarget.style.background = 'transparent' }}
-          >
-            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: area.color, flexShrink: 0 }} />
-            {area.name}
-            <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#9ca3af' }}>
-              {tasks.filter(t => t.areas?.name === area.name).length}
-            </span>
-          </div>
+            onHover={() => fetchAreaUsers(area.name)}
+            users={areaUsers[area.name] || []}
+          />
         ))}
 
         {profile.role !== 'intern' && (
@@ -335,6 +347,225 @@ export default function Dashboard() {
           onTaskCreated={fetchTasks}
           editingTask={editingTask}
         />
+      )}
+    </div>
+  )
+}
+
+function AreaSidebarItem({ area, count, isSelected, onClick, onHover, users }) {
+  const [hover, setHover] = useState(false)
+  const closeTimer = useRef(null)
+
+  const handleMouseEnter = () => {
+    clearTimeout(closeTimer.current)
+    setHover(true)
+    onHover()
+  }
+
+  const handleMouseLeave = () => {
+    closeTimer.current = setTimeout(() => setHover(false), 150)
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div
+        onClick={onClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '0.6rem',
+          padding: '0.5rem 0.75rem', borderRadius: '8px',
+          marginBottom: '0.25rem', cursor: 'pointer', fontSize: '0.9rem',
+          background: isSelected ? area.color + '15' : 'transparent',
+          fontWeight: isSelected ? 600 : 400,
+          color: isSelected ? area.color : 'inherit'
+        }}
+      >
+        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: area.color, flexShrink: 0 }} />
+        {area.name}
+        <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#9ca3af' }}>{count}</span>
+      </div>
+
+      {hover && (
+        <div
+          onMouseEnter={() => clearTimeout(closeTimer.current)}
+          onMouseLeave={handleMouseLeave}
+          style={{
+            position: 'absolute', left: '100%', top: 0,
+            background: 'white', border: '1px solid #e5e7eb',
+            borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+            padding: '0.75rem', minWidth: '200px',
+            zIndex: 999, marginLeft: '8px'
+          }}
+        >
+          {/* Arrow */}
+          <div style={{
+            position: 'absolute', right: '100%', top: '12px',
+            width: 0, height: 0,
+            borderTop: '6px solid transparent',
+            borderBottom: '6px solid transparent',
+            borderRight: '6px solid white'
+          }} />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: area.color }} />
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#111827' }}>{area.name}</span>
+            <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginLeft: 'auto' }}>{users.length} member{users.length !== 1 ? 's' : ''}</span>
+          </div>
+
+          {users.length === 0 ? (
+            <div style={{ fontSize: '0.8rem', color: '#9ca3af', textAlign: 'center', padding: '0.5rem' }}>
+              No members assigned
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+              {users.map(user => (
+                <UserPill key={user.id} user={user} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function UserPill({ user }) {
+  const [hover, setHover] = useState(false)
+  const [workload, setWorkload] = useState(null)
+  const [lastFetched, setLastFetched] = useState(null)
+
+  const loadWorkload = async () => {
+    const now = Date.now()
+    if (lastFetched && now - lastFetched < 3000) return
+    const { data } = await supabase
+      .from('task_assignments')
+      .select('tasks(id, title, area_id, areas(name, color), breakdowns(*))')
+      .eq('user_id', user.id)
+
+    const incomplete = (data || []).filter(a => {
+      const task = a.tasks
+      if (!task) return false
+      const total = task.breakdowns?.length || 0
+      const checked = task.breakdowns?.filter(b => b.is_checked).length || 0
+      if (total === 0) return true
+      return checked < total
+    })
+
+    setWorkload(incomplete)
+    setLastFetched(now)
+  }
+
+  const roleColor = user.role === 'admin' ? '#7c3aed' : user.role === 'member' ? '#1d4ed8' : '#6b7280'
+  const roleBg = user.role === 'admin' ? '#ede9fe' : user.role === 'member' ? '#dbeafe' : '#f3f4f6'
+
+  return (
+    <div
+      style={{ position: 'relative' }}
+      onMouseEnter={() => { setHover(true); loadWorkload() }}
+      onMouseLeave={() => setHover(false)}
+    >
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.4rem',
+        padding: '0.3rem 0.6rem', borderRadius: '20px',
+        background: roleBg, color: roleColor,
+        fontSize: '0.78rem', fontWeight: 500, cursor: 'pointer',
+        border: `1px solid ${roleColor}30`
+      }}>
+        <div style={{
+          width: '18px', height: '18px', borderRadius: '50%',
+          background: roleColor, color: 'white',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '0.6rem', fontWeight: 700, flexShrink: 0
+        }}>
+          {user.full_name?.charAt(0).toUpperCase()}
+        </div>
+        {user.full_name}
+      </div>
+
+      {/* Workload tooltip */}
+      {hover && (
+        <div style={{
+          position: 'absolute', left: '0', bottom: '130%',
+          background: 'white', border: '1px solid #e5e7eb',
+          borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          padding: '0.75rem', minWidth: '220px', maxWidth: '280px',
+          zIndex: 1000
+        }}>
+          {/* Arrow */}
+          <div style={{
+            position: 'absolute', top: '100%', left: '16px',
+            width: 0, height: 0,
+            borderLeft: '6px solid transparent',
+            borderRight: '6px solid transparent',
+            borderTop: '6px solid white'
+          }} />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <div style={{
+              width: '28px', height: '28px', borderRadius: '50%',
+              background: roleColor, color: 'white',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '0.75rem', fontWeight: 600, flexShrink: 0
+            }}>
+              {user.full_name?.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#111827' }}>{user.full_name}</div>
+              <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>
+                {workload ? `${workload.length} active task${workload.length !== 1 ? 's' : ''}` : 'Loading...'}
+              </div>
+            </div>
+          </div>
+
+          {!workload ? (
+            <div style={{ fontSize: '0.8rem', color: '#9ca3af', textAlign: 'center' }}>Loading...</div>
+          ) : workload.length === 0 ? (
+            <div style={{ fontSize: '0.8rem', color: '#9ca3af', textAlign: 'center' }}>No active tasks</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {workload.map(a => {
+                const task = a.tasks
+                if (!task) return null
+                const total = task.breakdowns?.length || 0
+                const checked = task.breakdowns?.filter(b => b.is_checked).length || 0
+                const percent = total > 0 ? Math.round((checked / total) * 100) : 0
+                const color = task.areas?.color || '#6366f1'
+                return (
+                  <div key={task.id} style={{
+                    padding: '0.5rem 0.6rem', background: '#f9fafb',
+                    borderRadius: '8px', borderLeft: `3px solid ${color}`
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#111827' }}>{task.title}</span>
+                      <span style={{
+                        fontSize: '0.7rem', padding: '0.1rem 0.4rem',
+                        background: color + '20', color: color,
+                        borderRadius: '10px', fontWeight: 600, flexShrink: 0
+                      }}>
+                        {task.areas?.name}
+                      </span>
+                    </div>
+                    {total > 0 && (
+                      <div>
+                        <div style={{ height: '4px', background: '#e5e7eb', borderRadius: '2px', overflow: 'hidden' }}>
+                          <div style={{
+                            height: '100%', borderRadius: '2px',
+                            background: percent === 100 ? '#10b981' : color,
+                            width: `${percent}%`, transition: 'width 0.3s'
+                          }} />
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: '0.2rem' }}>
+                          {percent}% complete
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
