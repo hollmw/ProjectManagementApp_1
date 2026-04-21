@@ -64,9 +64,10 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
 }
 
   const handleDelete = async () => {
-    await supabase.from('tasks').delete().eq('id', task.id)
-    onDelete(task.id)
-  }
+  const { error } = await supabase.from('tasks').delete().eq('id', task.id)
+  console.log('delete result:', error)
+  if (!error) onDelete(task.id)
+}
 
   const saveReview = async () => {
     setSavingReview(true)
