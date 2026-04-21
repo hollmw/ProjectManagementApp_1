@@ -26,9 +26,18 @@ const fetchAreas = async () => {
 }
 
 const handleDeleteUser = async (userId) => {
-  const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
-    method: 'DELETE'
-  })
+  const { data: { session } } = await supabase.auth.getSession()
+  
+  const response = await fetch(
+    `https://zrmqhkydlxkfbydnhngb.supabase.co/functions/v1/delete-user/${userId}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${session?.access_token}`
+      }
+    }
+  )
+
   const result = await response.json()
   if (result.error) {
     alert(result.error)
@@ -249,58 +258,55 @@ function UserModal({ editingUser, areas, onClose, onSaved }) {
     )
   }
 
-  const handleSave = async () => {
-    if (!fullName) return
-    setLoading(true)
-    setError('')
+const handleSave = async () => {
+  if (!fullName) return
+  setLoading(true)
+  setError('')
 
-    if (editingUser) {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ full_name: fullName, role })
-        .eq('id', editingUser.id)
+  if (editingUser) {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ full_name: fullName, role })
+      .eq('id', editingUser.id)
 
-      if (error) { setError(error.message); setLoading(false); return }
+    if (error) { setError(error.message); setLoading(false); return }
 
-      // Update areas — delete old, insert new
-      await supabase.from('user_areas').delete().eq('user_id', editingUser.id)
-      if (selectedAreas.length > 0) {
-        await supabase.from('user_areas').insert(
-          selectedAreas.map(area_id => ({ user_id: editingUser.id, area_id }))
-        )
+    await supabase.from('user_areas').delete().eq('user_id', editingUser.id)
+    if (selectedAreas.length > 0) {
+      await supabase.from('user_areas').insert(
+        selectedAreas.map(area_id => ({ user_id: editingUser.id, area_id }))
+      )
+    }
+    onSaved()
+    onClose()
+  } else {
+    if (!email || !password) { setError('Email and password required'); setLoading(false); return }
+
+    const response = await fetch(
+      'https://zrmqhkydlxkfbydnhngb.supabase.co/functions/v1/create-user',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        },
+        body: JSON.stringify({
+          email, password,
+          full_name: fullName,
+          role,
+          area_ids: selectedAreas
+        })
       }
-      onSaved()
-      onClose()
-} else {
-      console.log('creating user via server...')
-  if (!email || !password) { setError('Email and password required'); setLoading(false); return }
-  console.log('sending to localhost:5000...')
+    )
 
-  const response = await fetch('http://localhost:5000/api/users/create', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email,
-      password,
-      full_name: fullName,
-      role,
-      area_ids: selectedAreas
-    })
-  })
-
-  const result = await response.json()
-
-  if (result.error) {
-    setError(result.error)
-    setLoading(false)
-    return
+    const result = await response.json()
+    if (result.error) { setError(result.error); setLoading(false); return }
+    onSaved()
+    onClose()
   }
 
-  onSaved()
-  onClose()
+  setLoading(false)
 }
-    setLoading(false)
-  }
 
   return (
     <div style={{
