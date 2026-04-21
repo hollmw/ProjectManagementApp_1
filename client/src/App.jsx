@@ -3,6 +3,8 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import UserManagement from './pages/UserManagement'
 import ActivityLog from './pages/ActivityLog'
+import Leaderboard from './pages/Leaderboard'
+
 
 
 function App() {
@@ -13,6 +15,8 @@ function App() {
       <Route path="/users" element={<UserManagement />} />
       <Route path="*" element={<Navigate to="/login" />} />
       <Route path="/activity" element={<ActivityLog />} />
+      <Route path="/leaderboard" element={<Leaderboard />} />
+
 
     </Routes>
   )

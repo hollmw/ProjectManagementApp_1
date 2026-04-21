@@ -164,12 +164,11 @@ export default function Dashboard() {
       }}>
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '2rem' }}>
-          <div style={{
-            width: '32px', height: '32px', borderRadius: '8px',
-            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '1rem', flexShrink: 0
-          }}>📋</div>
+          <img
+            src="/src/assets/logo.png"
+            alt="Logo"
+            style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'contain', flexShrink: 0 }}
+          />
           <div>
             <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#111827' }}>WorkSpace</div>
             <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>Project Management</div>
@@ -222,6 +221,7 @@ export default function Dashboard() {
             {[
               { label: 'User Management', path: '/users' },
               { label: 'Activity Log', path: '/activity' },
+              { label: 'Leaderboard', path: '/leaderboard' },
             ].map(item => (
               <div
                 key={item.path}
@@ -412,7 +412,7 @@ function AreaSidebarItem({ area, count, isSelected, onClick, onHover, users }) {
   }
 
   const handleMouseLeave = () => {
-    closeTimer.current = setTimeout(() => setHover(false), 150)
+    closeTimer.current = setTimeout(() => setHover(false), 50)
   }
 
   return (
@@ -485,27 +485,36 @@ function UserPill({ user }) {
   const [hover, setHover] = useState(false)
   const [workload, setWorkload] = useState(null)
   const [lastFetched, setLastFetched] = useState(null)
+  const [userAreas, setUserAreas] = useState([])
 
-  const loadWorkload = async () => {
-    const now = Date.now()
-    if (lastFetched && now - lastFetched < 3000) return
-    const { data } = await supabase
+const loadWorkload = async () => {
+  const now = Date.now()
+  if (lastFetched && now - lastFetched < 3000) return
+
+  const [{ data: taskData }, { data: areaData }] = await Promise.all([
+    supabase
       .from('task_assignments')
       .select('tasks(id, title, area_id, areas(name, color), breakdowns(*))')
+      .eq('user_id', user.id),
+    supabase
+      .from('user_areas')
+      .select('areas(name, color)')
       .eq('user_id', user.id)
+  ])
 
-    const incomplete = (data || []).filter(a => {
-      const task = a.tasks
-      if (!task) return false
-      const total = task.breakdowns?.length || 0
-      const checked = task.breakdowns?.filter(b => b.is_checked).length || 0
-      if (total === 0) return true
-      return checked < total
-    })
+  const incomplete = (taskData || []).filter(a => {
+    const task = a.tasks
+    if (!task) return false
+    const total = task.breakdowns?.length || 0
+    const checked = task.breakdowns?.filter(b => b.is_checked).length || 0
+    if (total === 0) return true
+    return checked < total
+  })
 
-    setWorkload(incomplete)
-    setLastFetched(now)
-  }
+  setWorkload(incomplete)
+  setUserAreas((areaData || []).map(d => d.areas).filter(Boolean))
+  setLastFetched(now)
+}
 
   const roleColor = user.role === 'admin' ? '#7c3aed' : user.role === 'member' ? '#1d4ed8' : '#6b7280'
   const roleBg = user.role === 'admin' ? '#ede9fe' : user.role === 'member' ? '#dbeafe' : '#f3f4f6'
@@ -550,22 +559,39 @@ function UserPill({ user }) {
             borderTop: '6px solid white'
           }} />
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            <div style={{
-              width: '28px', height: '28px', borderRadius: '50%',
-              background: roleColor, color: 'white',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '0.75rem', fontWeight: 600, flexShrink: 0
-            }}>
-              {user.full_name?.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#111827' }}>{user.full_name}</div>
-              <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>
-                {workload ? `${workload.length} active task${workload.length !== 1 ? 's' : ''}` : 'Loading...'}
-              </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          <div style={{
+            width: '28px', height: '28px', borderRadius: '50%',
+            background: roleColor, color: 'white',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '0.75rem', fontWeight: 600, flexShrink: 0
+          }}>
+            {user.full_name?.charAt(0).toUpperCase()}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#111827' }}>{user.full_name}</div>
+            <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>
+              {workload ? `${workload.length} active task${workload.length !== 1 ? 's' : ''}` : 'Loading...'}
             </div>
           </div>
+          {/* Area dots top right */}
+          {userAreas.length > 0 && (
+            <div style={{ display: 'flex', gap: '3px', alignSelf: 'flex-start' }}>
+              {userAreas.slice(0, 6).map(area => (
+                <div
+                  key={area.name}
+                  title={area.name}
+                  style={{
+                    width: '8px', height: '8px', borderRadius: '50%',
+                    background: area.color,
+                    border: '1px solid white',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
           {!workload ? (
             <div style={{ fontSize: '0.8rem', color: '#9ca3af', textAlign: 'center' }}>Loading...</div>

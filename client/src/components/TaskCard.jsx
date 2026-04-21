@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
-import { logActivity } from '../utils/logActivity'
+import { logActivity, awardPerfectReviewBadge} from '../utils/logActivity'
 
 export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, onReviewSaved, onAssignmentChange, userRole }) {  const breakdowns = [...(task.breakdowns || [])].sort((a, b) => a.order_index - b.order_index)
   const [review, setReview] = useState(task.reviews?.[0] || null)
@@ -81,6 +81,7 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
         .single()
       setReview(data)
       if (data) onReviewSaved(task.id, data)
+      if (score === 10) await awardPerfectReviewBadge(task.id)
     } else {
       const { data } = await supabase
         .from('reviews')
@@ -89,6 +90,7 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
         .single()
       setReview(data)
       if (data) onReviewSaved(task.id, data)
+      if (score === 10) { await awardPerfectReviewBadge(task.id) }
     }
     setSavingReview(false)
     setShowReview(false)
