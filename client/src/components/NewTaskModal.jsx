@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
-function SortableBreakdown({ id, value, index, onChange, onRemove, canRemove }) {
+function SortableBreakdown({ id, value, startDate, endDate, index, onChange, onRemove, canRemove }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
 
   const style = {
@@ -27,39 +27,40 @@ function SortableBreakdown({ id, value, index, onChange, onRemove, canRemove }) 
   }
 
   return (
-    <div ref={setNodeRef} style={{ ...style, display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
-      {/* Drag handle */}
-      <div
-        {...attributes}
-        {...listeners}
-        style={{
-          cursor: 'grab', padding: '0.5rem 0.4rem',
-          color: '#9ca3af', fontSize: '1rem', lineHeight: 1,
-          display: 'flex', alignItems: 'center', flexShrink: 0
-        }}
-      >
-        ⠿
-      </div>
-      <input
-        value={value}
-        onChange={e => onChange(index, e.target.value)}
-        placeholder={`Step ${index + 1}`}
-        style={{
-          flex: 1, padding: '0.6rem 0.75rem',
-          border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '0.9rem'
-        }}
-      />
-      {canRemove && (
-        <button
-          onClick={() => onRemove(index)}
-          style={{
-            padding: '0.6rem', background: '#fee2e2',
-            color: '#dc2626', border: 'none', borderRadius: '8px', cursor: 'pointer'
-          }}
+    <div ref={setNodeRef} style={{ ...style, marginBottom: '0.75rem', background: '#f9fafb', borderRadius: '8px', padding: '0.75rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+        <div
+          {...attributes}
+          {...listeners}
+          style={{ cursor: 'grab', padding: '0.4rem', color: '#9ca3af', fontSize: '1rem', lineHeight: 1, flexShrink: 0 }}
         >
-          ✕
-        </button>
-      )}
+          ⠿
+        </div>
+        <input
+          value={value}
+          onChange={e => onChange(index, 'title', e.target.value)}
+          placeholder={`Step ${index + 1}`}
+          style={{ flex: 1, padding: '0.6rem 0.75rem', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '0.9rem' }}
+        />
+        {canRemove && (
+          <button onClick={() => onRemove(index)}
+            style={{ padding: '0.6rem', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '8px', cursor: 'pointer', flexShrink: 0 }}>
+            ✕
+          </button>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: '0.5rem', paddingLeft: '2rem' }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ display: 'block', fontSize: '0.72rem', color: '#9ca3af', marginBottom: '0.2rem' }}>Start</label>
+          <input type="date" value={startDate || ''} onChange={e => onChange(index, 'start_date', e.target.value)}
+            style={{ width: '100%', padding: '0.4rem 0.6rem', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '0.8rem', boxSizing: 'border-box' }} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={{ display: 'block', fontSize: '0.72rem', color: '#9ca3af', marginBottom: '0.2rem' }}>End</label>
+          <input type="date" value={endDate || ''} onChange={e => onChange(index, 'end_date', e.target.value)}
+            style={{ width: '100%', padding: '0.4rem 0.6rem', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '0.8rem', boxSizing: 'border-box' }} />
+        </div>
+      </div>
     </div>
   )
 }
@@ -69,13 +70,14 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
   const [description, setDescription] = useState(editingTask?.description || '')
   const [areaId, setAreaId] = useState(editingTask?.area_id || '')
   const [dueDate, setDueDate] = useState(editingTask?.due_date || '')
+  const [startDate, setStartDate] = useState(editingTask?.start_date || '')
   const [breakdowns, setBreakdowns] = useState(
     editingTask?.breakdowns
       ? [...editingTask.breakdowns]
           .sort((a, b) => a.order_index - b.order_index)
-          .map((b, i) => ({ id: `item-${i}`, title: b.title, is_checked: b.is_checked }))
-      : [{ id: 'item-0', title: '', is_checked: false }]
-  )
+          .map((b, i) => ({ id: `item-${i}`, title: b.title, is_checked: b.is_checked, start_date: b.start_date || '', end_date: b.end_date || '' }))
+      : [{ id: 'item-0', title: '', is_checked: false, start_date: '', end_date: '' }]
+  ) 
   const [areas, setAreas] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -105,12 +107,12 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
 
   const addBreakdown = () => {
     const newId = `item-${Date.now()}`
-    setBreakdowns([...breakdowns, { id: newId, title: '', is_checked: false }])
+    setBreakdowns([...breakdowns, { id: newId, title: '', is_checked: false, start_date: '', end_date: '' }])
   }
 
-  const updateBreakdown = (index, value) => {
+  const updateBreakdown = (index, field, value) => {
     const updated = [...breakdowns]
-    updated[index] = { ...updated[index], title: value }
+    updated[index] = { ...updated[index], [field]: value }
     setBreakdowns(updated)
   }
 
@@ -127,7 +129,7 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
     if (editingTask) {
       await supabase
         .from('tasks')
-        .update({ title, description, area_id: areaId, due_date: dueDate || null })
+        .update({ title, description, area_id: areaId, due_date: dueDate || null, start_date: startDate || null })
         .eq('id', editingTask.id)
 
       await supabase.from('breakdowns').delete().eq('task_id', editingTask.id)
@@ -136,17 +138,19 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
       if (validBreakdowns.length > 0) {
         await supabase.from('breakdowns').insert(
           validBreakdowns.map((b, index) => ({
-            task_id: editingTask.id,
+            task_id: editingTask?.id,
             title: b.title,
             is_checked: b.is_checked,
-            order_index: index
+            order_index: index,
+            start_date: b.start_date || null,
+            end_date: b.end_date || null
           }))
         )
       }
     } else {
       const { data: task, error } = await supabase
         .from('tasks')
-        .insert({ title, description, area_id: areaId, due_date: dueDate || null, created_by: user.id })
+        .insert({ title, description, area_id: areaId, due_date: dueDate || null, start_date: startDate || null, created_by: user.id })
         .select()
         .single()
 
@@ -205,11 +209,14 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
             <option key={area.id} value={area.id}>{area.name}</option>
           ))}
         </select>
+        
+      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.4rem' }}>Start Date</label>
+      <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+        style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '0.9rem', marginBottom: '1rem', boxSizing: 'border-box' }} />
 
-        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.4rem' }}>Expected Completion Date</label>
-        <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-          style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '0.9rem', marginBottom: '1rem', boxSizing: 'border-box' }} />
-
+      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.4rem' }}>Expected Completion Date</label>
+      <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
+        style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '0.9rem', marginBottom: '1rem', boxSizing: 'border-box' }} />
         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.4rem' }}>Breakdown Steps</label>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={breakdowns.map(b => b.id)} strategy={verticalListSortingStrategy}>
@@ -218,6 +225,8 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
                 key={b.id}
                 id={b.id}
                 value={b.title}
+                startDate={b.start_date}
+                endDate={b.end_date}
                 index={i}
                 onChange={updateBreakdown}
                 onRemove={removeBreakdown}

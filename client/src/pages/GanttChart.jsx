@@ -128,13 +128,17 @@ export default function GanttChart() {
     })
 
   const today = new Date()
-  const dates = filteredTasks.map(t => new Date(t.due_date))
 
-  const minDate = dates.length > 0
-    ? new Date(Math.min(...dates.map(d => d.getTime()), today.getTime()))
+  const allDates = filteredTasks.flatMap(t => [
+    t.start_date ? new Date(t.start_date) : null,
+    t.due_date ? new Date(t.due_date) : null
+  ]).filter(Boolean)
+
+  const minDate = allDates.length > 0
+    ? new Date(Math.min(...allDates.map(d => d.getTime()), today.getTime()))
     : today
-  const maxDate = dates.length > 0
-    ? new Date(Math.max(...dates.map(d => d.getTime())))
+  const maxDate = allDates.length > 0
+    ? new Date(Math.max(...allDates.map(d => d.getTime())))
     : new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)
 
   minDate.setDate(minDate.getDate() - 7)
@@ -389,6 +393,12 @@ export default function GanttChart() {
                     const color = task.areas?.color || '#6366f1'
                     const isComplete = percent === 100
 
+                    const startX = task.start_date
+                      ? Math.floor((new Date(task.start_date) - minDate) / (1000 * 60 * 60 * 24)) * dayWidth
+                      : x - 60
+                    const endX = x + dayWidth / 2
+                    const barWidth = Math.max(endX - startX, 80)
+
                     return (
                       <div key={task.id} style={{
                         height: `${rowHeight}px`, position: 'relative',
@@ -405,17 +415,23 @@ export default function GanttChart() {
                           )
                         ))}
 
+                        {/* Task bar spanning start to due date */}
                         <div
                           onMouseEnter={(e) => handleMouseEnter(task, e)}
                           onMouseMove={handleMouseMove}
                           onMouseLeave={handleMouseLeave}
                           style={{
-                            position: 'absolute', left: x - 60,
+                            position: 'absolute',
+                            left: startX,
                             top: '50%', transform: 'translateY(-50%)',
-                            height: '28px', width: '120px', borderRadius: '6px',
-                            background: color, opacity: isComplete ? 0.5 : 1,
-                            cursor: 'pointer', display: 'flex', alignItems: 'center',
-                            overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.15)'
+                            height: '28px', width: `${barWidth}px`,
+                            borderRadius: '6px',
+                            background: color,
+                            opacity: isComplete ? 0.5 : 1,
+                            cursor: 'pointer',
+                            display: 'flex', alignItems: 'center',
+                            overflow: 'hidden',
+                            boxShadow: '0 1px 4px rgba(0,0,0,0.15)'
                           }}
                         >
                           <div style={{
@@ -431,13 +447,6 @@ export default function GanttChart() {
                             {isComplete ? '✓ ' : ''}{task.title}
                           </span>
                         </div>
-
-                        <div style={{
-                          position: 'absolute', left: x + dayWidth / 2 - 1,
-                          top: '50%', transform: 'translateY(-50%)',
-                          width: '2px', height: '20px',
-                          background: color, opacity: 0.6
-                        }} />
                       </div>
                     )
                   })}
@@ -480,7 +489,10 @@ export default function GanttChart() {
             <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: hoveredTask.areas?.color || '#6366f1', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#111827' }}>{hoveredTask.title}</div>
-              <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{hoveredTask.areas?.name} · Due {new Date(hoveredTask.due_date).toLocaleDateString()}</div>
+              <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>
+                {hoveredTask.start_date && `${new Date(hoveredTask.start_date).toLocaleDateString()} → `}
+                {hoveredTask.areas?.name} · Due {new Date(hoveredTask.due_date).toLocaleDateString()}
+              </div>
             </div>
           </div>
 
@@ -511,6 +523,13 @@ export default function GanttChart() {
                   </div>
                   <span style={{ fontSize: '0.75rem', color: b.is_checked ? '#9ca3af' : '#374151', textDecoration: b.is_checked ? 'line-through' : 'none' }}>
                     {b.title}
+                    {(b.start_date || b.end_date) && (
+                      <span style={{ color: '#9ca3af', marginLeft: '0.4rem' }}>
+                        {b.start_date && new Date(b.start_date).toLocaleDateString()}
+                        {b.start_date && b.end_date && ' → '}
+                        {b.end_date && new Date(b.end_date).toLocaleDateString()}
+                      </span>
+                    )}
                   </span>
                 </div>
               ))}

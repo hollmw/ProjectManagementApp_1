@@ -15,6 +15,9 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
   const [showAssign, setShowAssign] = useState(false)
   const [users, setUsers] = useState([])
   const [assignments, setAssignments] = useState(task.task_assignments || [])
+  const [editingDates, setEditingDates] = useState(false)
+  const [taskStartDate, setTaskStartDate] = useState(task.start_date || '')
+  const [taskDueDate, setTaskDueDate] = useState(task.due_date || '')
   
 
   useEffect(() => {
@@ -264,6 +267,55 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
         <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.75rem' }}>{task.description}</p>
       )}
 
+            {/* Dates section */}
+      <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>
+          {task.start_date && <span>Start: <strong>{new Date(task.start_date).toLocaleDateString()}</strong></span>}
+          {task.start_date && task.due_date && <span style={{ margin: '0 0.4rem' }}>→</span>}
+          {task.due_date && <span>Due: <strong>{new Date(task.due_date).toLocaleDateString()}</strong></span>}
+        </div>
+        <button
+          onClick={() => setEditingDates(!editingDates)}
+          style={{
+            fontSize: '0.72rem', padding: '0.2rem 0.5rem',
+            background: '#f3f4f6', border: 'none', borderRadius: '6px',
+            cursor: 'pointer', color: '#6b7280'
+          }}
+        >
+          {editingDates ? 'Cancel' : 'Edit dates'}
+        </button>
+      </div>
+
+      {editingDates && (
+        <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.75rem', padding: '0.75rem', background: '#f9fafb', borderRadius: '8px' }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', fontSize: '0.72rem', color: '#9ca3af', marginBottom: '0.2rem' }}>Start date</label>
+            <input type="date" value={taskStartDate} onChange={e => setTaskStartDate(e.target.value)}
+              style={{ width: '100%', padding: '0.4rem 0.6rem', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '0.8rem', boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', fontSize: '0.72rem', color: '#9ca3af', marginBottom: '0.2rem' }}>Due date</label>
+            <input type="date" value={taskDueDate} onChange={e => setTaskDueDate(e.target.value)}
+              style={{ width: '100%', padding: '0.4rem 0.6rem', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '0.8rem', boxSizing: 'border-box' }} />
+          </div>
+          <button
+            onClick={async () => {
+              await supabase.from('tasks').update({
+                start_date: taskStartDate || null,
+                due_date: taskDueDate || null
+              }).eq('id', task.id)
+              setEditingDates(false)
+            }}
+            style={{
+              alignSelf: 'flex-end', padding: '0.4rem 0.75rem',
+              background: '#6366f1', color: 'white', border: 'none',
+              borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer'
+            }}
+          >
+            Save
+          </button>
+        </div>
+      )}
       {/* Breakdowns */}
       {breakdowns.length > 0 && (
         <div style={{ marginTop: '0.75rem' }}>
