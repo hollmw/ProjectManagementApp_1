@@ -166,13 +166,13 @@ export default function Dashboard() {
       }}>
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '2rem' }}>
-          <img
-            src="/src/public/logo.png"
-            alt="Logo"
-            style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'contain', flexShrink: 0 }}
-          />
+          <div style={{
+            width: '32px', height: '32px', borderRadius: '8px',
+            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem'
+          }}>📋</div>
           <div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#111827' }}>Work Space</div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>WorkSpace</div>
             <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>Project Management</div>
           </div>
         </div>
