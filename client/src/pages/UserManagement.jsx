@@ -98,7 +98,7 @@ useEffect(() => {
           onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
         >
-          Task Board
+          📋 Task Board
         </div>
 
         <div style={{

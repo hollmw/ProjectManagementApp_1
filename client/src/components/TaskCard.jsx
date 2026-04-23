@@ -184,7 +184,6 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
           </div>
 
           {/* Three dot menu */}
-          {userRole !== 'intern' && (
 
           <div style={{ position: 'relative' }}>
             <button
@@ -216,6 +215,7 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
                 >
                   Edit task
                 </button>
+                {userRole !== 'intern' && (
                 <button
                   onClick={() => { setShowMenu(false); setConfirmDelete(true) }}
                   style={{
@@ -228,10 +228,11 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
                 >
                   Delete task
                 </button>
+                )}
               </div>
             )}
           </div>
-          )}
+          
         </div>
       </div>
 
@@ -390,6 +391,7 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
               </span>
             )}
           </div>
+          {userRole !== 'intern' && (
           <button
             onClick={() => setShowReview(!showReview)}
             style={{
@@ -401,6 +403,7 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
           >
             {review ? 'Edit review' : '+ Add review'}
           </button>
+          )}
         </div>
 
         {review && !showReview && review.notes && (

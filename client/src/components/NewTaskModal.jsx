@@ -1,5 +1,68 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+
+function SortableBreakdown({ id, value, index, onChange, onRemove, canRemove }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={{ ...style, display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+      {/* Drag handle */}
+      <div
+        {...attributes}
+        {...listeners}
+        style={{
+          cursor: 'grab', padding: '0.5rem 0.4rem',
+          color: '#9ca3af', fontSize: '1rem', lineHeight: 1,
+          display: 'flex', alignItems: 'center', flexShrink: 0
+        }}
+      >
+        ⠿
+      </div>
+      <input
+        value={value}
+        onChange={e => onChange(index, e.target.value)}
+        placeholder={`Step ${index + 1}`}
+        style={{
+          flex: 1, padding: '0.6rem 0.75rem',
+          border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '0.9rem'
+        }}
+      />
+      {canRemove && (
+        <button
+          onClick={() => onRemove(index)}
+          style={{
+            padding: '0.6rem', background: '#fee2e2',
+            color: '#dc2626', border: 'none', borderRadius: '8px', cursor: 'pointer'
+          }}
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  )
+}
 
 export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
   const [title, setTitle] = useState(editingTask?.title || '')
@@ -7,10 +70,19 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
   const [areaId, setAreaId] = useState(editingTask?.area_id || '')
   const [dueDate, setDueDate] = useState(editingTask?.due_date || '')
   const [breakdowns, setBreakdowns] = useState(
-    editingTask?.breakdowns?.map(b => ({ title: b.title, is_checked: b.is_checked })) || [{ title: '', is_checked: false }]
+    editingTask?.breakdowns
+      ? [...editingTask.breakdowns]
+          .sort((a, b) => a.order_index - b.order_index)
+          .map((b, i) => ({ id: `item-${i}`, title: b.title, is_checked: b.is_checked }))
+      : [{ id: 'item-0', title: '', is_checked: false }]
   )
   const [areas, setAreas] = useState([])
   const [loading, setLoading] = useState(false)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
 
   useEffect(() => {
     const fetchAreas = async () => {
@@ -20,7 +92,21 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
     fetchAreas()
   }, [])
 
-  const addBreakdown = () => setBreakdowns([...breakdowns, { title: '', is_checked: false }])
+  const handleDragEnd = (event) => {
+    const { active, over } = event
+    if (active.id !== over?.id) {
+      setBreakdowns(items => {
+        const oldIndex = items.findIndex(i => i.id === active.id)
+        const newIndex = items.findIndex(i => i.id === over.id)
+        return arrayMove(items, oldIndex, newIndex)
+      })
+    }
+  }
+
+  const addBreakdown = () => {
+    const newId = `item-${Date.now()}`
+    setBreakdowns([...breakdowns, { id: newId, title: '', is_checked: false }])
+  }
 
   const updateBreakdown = (index, value) => {
     const updated = [...breakdowns]
@@ -44,10 +130,7 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
         .update({ title, description, area_id: areaId, due_date: dueDate || null })
         .eq('id', editingTask.id)
 
-      await supabase
-        .from('breakdowns')
-        .delete()
-        .eq('task_id', editingTask.id)
+      await supabase.from('breakdowns').delete().eq('task_id', editingTask.id)
 
       const validBreakdowns = breakdowns.filter(b => b.title.trim() !== '')
       if (validBreakdowns.length > 0) {
@@ -128,17 +211,22 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
           style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '0.9rem', marginBottom: '1rem', boxSizing: 'border-box' }} />
 
         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.4rem' }}>Breakdown Steps</label>
-        {breakdowns.map((b, i) => (
-          <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            <input value={b.title} onChange={e => updateBreakdown(i, e.target.value)}
-              placeholder={`Step ${i + 1}`}
-              style={{ flex: 1, padding: '0.6rem 0.75rem', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '0.9rem' }} />
-            {breakdowns.length > 1 && (
-              <button onClick={() => removeBreakdown(i)}
-                style={{ padding: '0.6rem', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>✕</button>
-            )}
-          </div>
-        ))}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={breakdowns.map(b => b.id)} strategy={verticalListSortingStrategy}>
+            {breakdowns.map((b, i) => (
+              <SortableBreakdown
+                key={b.id}
+                id={b.id}
+                value={b.title}
+                index={i}
+                onChange={updateBreakdown}
+                onRemove={removeBreakdown}
+                canRemove={breakdowns.length > 1}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
+
         <button onClick={addBreakdown}
           style={{ background: 'none', border: '1px dashed #d1d5db', borderRadius: '8px', padding: '0.5rem 1rem', fontSize: '0.85rem', color: '#6b7280', cursor: 'pointer', width: '100%', marginBottom: '1.5rem' }}>
           + Add step
