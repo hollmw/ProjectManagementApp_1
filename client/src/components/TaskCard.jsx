@@ -41,7 +41,6 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
   const { data: { user } } = await supabase.auth.getUser()
 
   if (newChecked) {
-    // Check if points already awarded for this breakdown
     const { data: existing } = await supabase
       .from('activity_log')
       .select('id')
@@ -56,7 +55,7 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
       user.id,
       `Completed step "${breakdown.title}" on task "${task.title}"`,
       task.id,
-      alreadyAwarded ? 0 : 10  // only award points first time
+      alreadyAwarded ? 0 : 10
     )
   } else {
     await logActivity(
@@ -187,7 +186,6 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
           </div>
 
           {/* Three dot menu */}
-
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowMenu(!showMenu)}
@@ -267,7 +265,7 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
         <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.75rem' }}>{task.description}</p>
       )}
 
-            {/* Dates section */}
+      {/* Dates section */}
       <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>
           {task.start_date && <span>Start: <strong>{new Date(task.start_date).toLocaleDateString()}</strong></span>}
@@ -304,6 +302,22 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
                 start_date: taskStartDate || null,
                 due_date: taskDueDate || null
               }).eq('id', task.id)
+
+              // Log the date change
+              const { data: { user } } = await supabase.auth.getUser()
+              const startLabel = taskStartDate
+                ? new Date(taskStartDate).toLocaleDateString('default', { day: 'numeric', month: 'short', year: 'numeric' })
+                : 'none'
+              const dueLabel = taskDueDate
+                ? new Date(taskDueDate).toLocaleDateString('default', { day: 'numeric', month: 'short', year: 'numeric' })
+                : 'none'
+              await logActivity(
+                user.id,
+                `Updated dates on "${task.title}" — start: ${startLabel}, due: ${dueLabel}`,
+                task.id,
+                0
+              )
+
               setEditingDates(false)
             }}
             style={{
@@ -316,6 +330,7 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
           </button>
         </div>
       )}
+
       {/* Breakdowns */}
       {breakdowns.length > 0 && (
         <div style={{ marginTop: '0.75rem' }}>
@@ -355,6 +370,14 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
               }}>
                 {b.title}
               </span>
+              {/* Show scheduled dates inline if set */}
+              {(b.start_date || b.end_date) && (
+                <span style={{ fontSize: '0.7rem', color: '#9ca3af', marginLeft: 'auto' }}>
+                  {b.start_date && new Date(b.start_date).toLocaleDateString('default', { day: 'numeric', month: 'short' })}
+                  {b.start_date && b.end_date && ' – '}
+                  {b.end_date && new Date(b.end_date).toLocaleDateString('default', { day: 'numeric', month: 'short' })}
+                </span>
+              )}
             </div>
           ))}
 
@@ -537,30 +560,28 @@ export default function TaskCard({ task, onBreakdownToggle, onDelete, onEdit, on
 function UserAvatar({ profile, index, total }) {
   const [hover, setHover] = useState(false)
   const [workload, setWorkload] = useState(null)
-
   const [lastFetched, setLastFetched] = useState(null)
 
   const loadWorkload = async () => {
-  const now = Date.now()
-  if (lastFetched && now - lastFetched < 3000) return
-  const { data } = await supabase
-    .from('task_assignments')
-    .select('tasks(id, title, area_id, areas(name, color), breakdowns(*))')
-    .eq('user_id', profile.id)
-  
-  // Filter out fully completed tasks
-  const incomplete = (data || []).filter(a => {
-    const task = a.tasks
-    if (!task) return false
-    const total = task.breakdowns?.length || 0
-    const checked = task.breakdowns?.filter(b => b.is_checked).length || 0
-    if (total === 0) return true
-    return checked < total
-  })
+    const now = Date.now()
+    if (lastFetched && now - lastFetched < 3000) return
+    const { data } = await supabase
+      .from('task_assignments')
+      .select('tasks(id, title, area_id, areas(name, color), breakdowns(*))')
+      .eq('user_id', profile.id)
+    
+    const incomplete = (data || []).filter(a => {
+      const task = a.tasks
+      if (!task) return false
+      const total = task.breakdowns?.length || 0
+      const checked = task.breakdowns?.filter(b => b.is_checked).length || 0
+      if (total === 0) return true
+      return checked < total
+    })
 
-  setWorkload(incomplete)
-  setLastFetched(now)
-}
+    setWorkload(incomplete)
+    setLastFetched(now)
+  }
 
   return (
     <div
@@ -568,7 +589,6 @@ function UserAvatar({ profile, index, total }) {
       onMouseEnter={() => { setHover(true); loadWorkload() }}
       onMouseLeave={() => setHover(false)}
     >
-      {/* Avatar circle */}
       <div style={{
         width: '24px', height: '24px', borderRadius: '50%',
         background: '#6366f1', color: 'white',
@@ -579,7 +599,6 @@ function UserAvatar({ profile, index, total }) {
         {profile?.full_name?.charAt(0).toUpperCase() || '?'}
       </div>
 
-      {/* Hover pill */}
       {hover && (
         <div style={{
           position: 'absolute', bottom: '130%', left: '50%',
@@ -589,7 +608,6 @@ function UserAvatar({ profile, index, total }) {
           padding: '0.75rem', minWidth: '220px', maxWidth: '280px',
           zIndex: 999
         }}>
-          {/* Arrow */}
           <div style={{
             position: 'absolute', top: '100%', left: '50%',
             transform: 'translateX(-50%)',
@@ -599,7 +617,6 @@ function UserAvatar({ profile, index, total }) {
             borderTop: '6px solid white'
           }} />
 
-          {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
             <div style={{
               width: '28px', height: '28px', borderRadius: '50%',
@@ -615,7 +632,6 @@ function UserAvatar({ profile, index, total }) {
             </div>
           </div>
 
-          {/* Task list */}
           {!workload ? (
             <div style={{ fontSize: '0.8rem', color: '#9ca3af', textAlign: 'center', padding: '0.5rem' }}>Loading...</div>
           ) : workload.length === 0 ? (

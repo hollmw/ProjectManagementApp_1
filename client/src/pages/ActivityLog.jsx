@@ -55,12 +55,15 @@ export default function ActivityLog() {
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
     return `${Math.floor(seconds / 86400)}d ago`
-    }
+  }
 
   const getActionIcon = (action) => {
     if (action.includes('Completed')) return { icon: '✓', bg: '#d1fae5', color: '#059669' }
     if (action.includes('Unchecked')) return { icon: '○', bg: '#fee2e2', color: '#dc2626' }
     if (action.includes('Reviewed')) return { icon: '★', bg: '#fef3c7', color: '#d97706' }
+    if (action.includes('date') || action.includes('Date') || action.includes('scheduled') || action.includes('deadline')) {
+      return { icon: '📅', bg: '#ede9fe', color: '#7c3aed' }
+    }
     return { icon: '·', bg: '#f3f4f6', color: '#6b7280' }
   }
 
