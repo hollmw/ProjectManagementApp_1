@@ -439,9 +439,9 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
     supabase.from('areas').select('*').then(({ data }) => setAreas(data || []))
   }, [])
 
-  // Auto-show timeline when both dates are filled
+  // Auto-show timeline only when both dates are fully typed
   useEffect(() => {
-    if (startDate && dueDate) setShowTimeline(true)
+    if (isCompleteDate(startDate) && isCompleteDate(dueDate)) setShowTimeline(true)
   }, [startDate, dueDate])
 
   const handleDragEnd = (event) => {
@@ -480,6 +480,13 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
       b.id === bdId ? { ...b, start_date: newStart, end_date: newEnd } : b
     ))
   }, [])
+
+  // Only treat a date as valid once the year is fully typed (4 digits)
+  const isCompleteDate = (d) => {
+    if (!d) return false
+    const year = d.split('-')[0]
+    return year && year.length === 4 && parseInt(year) >= 1900 && parseInt(year) <= 2100
+  }
 
   // Selected area color
   const selectedArea = areas.find(a => a.id === areaId)
@@ -578,7 +585,7 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
     setLoading(false)
   }
 
-  const canShowTimeline = startDate && dueDate && new Date(dueDate) > new Date(startDate)
+  const canShowTimeline = isCompleteDate(startDate) && isCompleteDate(dueDate) && new Date(dueDate) > new Date(startDate)
   const hasNamedBreakdowns = breakdowns.some(b => b.title.trim())
 
   return (
@@ -670,7 +677,10 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
               Start Date
             </label>
             <input
-              type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+              type="date" value={startDate} onChange={e => {
+                const v = e.target.value
+                setStartDate(v)
+              }}
               style={{
                 width: '100%', padding: '0.6rem 0.75rem',
                 border: '1.5px solid #e5e7eb', borderRadius: '8px',
@@ -685,7 +695,10 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
               Due Date
             </label>
             <input
-              type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
+              type="date" value={dueDate} onChange={e => {
+                const v = e.target.value
+                setDueDate(v)
+              }}
               style={{
                 width: '100%', padding: '0.6rem 0.75rem',
                 border: '1.5px solid #e5e7eb', borderRadius: '8px',
