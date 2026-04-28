@@ -6,6 +6,7 @@ export default function ActivityLog() {
   const [logs, setLogs] = useState([])
   const [users, setUsers] = useState([])
   const [selectedUser, setSelectedUser] = useState('all')
+  const [filterType, setFilterType] = useState('all')
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
@@ -33,7 +34,7 @@ export default function ActivityLog() {
       .from('activity_log')
       .select('*, profiles(id, full_name, role), tasks(id, title, areas(name, color))')
       .order('created_at', { ascending: false })
-      .limit(100)
+      .limit(500)
 
     if (userId && userId !== 'all') {
       query = query.eq('user_id', userId)
@@ -44,10 +45,25 @@ export default function ActivityLog() {
     setLoading(false)
   }
 
+  const matchesType = (action, type) => {
+    if (type === 'all') return true
+    if (type === 'completed') return action.includes('Completed')
+    if (type === 'unchecked') return action.includes('Unchecked')
+    if (type === 'reviewed') return action.includes('Reviewed')
+    if (type === 'dates') return (
+      action.includes('date') || action.includes('Date') ||
+      action.includes('Rescheduled') || action.includes('scheduled') ||
+      action.includes('deadline')
+    )
+    return true
+  }
+
   const handleUserChange = (userId) => {
     setSelectedUser(userId)
     fetchLogs(userId)
   }
+
+  const filteredLogs = logs.filter(log => matchesType(log.action, filterType))
 
   const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - new Date(date + 'Z')) / 1000)
@@ -171,9 +187,37 @@ export default function ActivityLog() {
           </p>
         </div>
 
+        {/* Type filter pills */}
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+          {[
+            { key: 'all', label: 'All activity' },
+            { key: 'completed', label: '✓ Completed' },
+            { key: 'dates', label: '📅 Date changes' },
+            { key: 'reviewed', label: '★ Reviews' },
+            { key: 'unchecked', label: '○ Unchecked' },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setFilterType(key)}
+              style={{
+                padding: '0.35rem 0.85rem', borderRadius: '20px', fontSize: '0.8rem',
+                fontWeight: filterType === key ? 600 : 400,
+                cursor: 'pointer', border: 'none',
+                background: filterType === key ? '#6366f1' : 'white',
+                color: filterType === key ? 'white' : '#6b7280',
+                boxShadow: filterType === key ? '0 1px 4px rgba(99,102,241,0.3)' : '0 1px 2px rgba(0,0,0,0.06)',
+                transition: 'all 0.15s',
+              }}
+            >{label}</button>
+          ))}
+          <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: '#9ca3af', alignSelf: 'center' }}>
+            {filteredLogs.length} entr{filteredLogs.length !== 1 ? 'ies' : 'y'}
+          </span>
+        </div>
+
         {loading ? (
           <div style={{ color: '#9ca3af', padding: '2rem', textAlign: 'center' }}>Loading...</div>
-        ) : logs.length === 0 ? (
+        ) : filteredLogs.length === 0 ? (
           <div style={{
             background: 'white', borderRadius: '12px', padding: '2rem',
             textAlign: 'center', color: '#9ca3af', border: '1px solid #e5e7eb'
@@ -182,7 +226,7 @@ export default function ActivityLog() {
           </div>
         ) : (
           <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-            {logs.map((log, i) => {
+            {filteredLogs.map((log, i) => {
               const { icon, bg, color } = getActionIcon(log.action)
               return (
                 <div
@@ -190,7 +234,7 @@ export default function ActivityLog() {
                   style={{
                     display: 'flex', alignItems: 'flex-start', gap: '1rem',
                     padding: '1rem 1.25rem',
-                    borderBottom: i < logs.length - 1 ? '1px solid #f3f4f6' : 'none'
+                    borderBottom: i < filteredLogs.length - 1 ? '1px solid #f3f4f6' : 'none'
                   }}
                 >
                   {/* Icon */}

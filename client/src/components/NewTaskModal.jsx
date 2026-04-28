@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../supabase'
+import { logActivity } from '../utils/logActivity'
 import {
   DndContext,
   closestCenter,
@@ -495,6 +496,23 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
         due_date: dueDate || null, start_date: startDate || null,
       }).eq('id', editingTask.id)
 
+      // Log task-level date changes
+      const oldStart = editingTask.start_date || ''
+      const oldDue = editingTask.due_date || ''
+      if (oldStart !== (startDate || '') || oldDue !== (dueDate || '')) {
+        const fmt = (d) => d ? new Date(d).toLocaleDateString('default', { day: 'numeric', month: 'short', year: 'numeric' }) : 'none'
+        await logActivity(
+          user.id,
+          `Updated dates on "${title}" — start: ${fmt(startDate)}, due: ${fmt(dueDate)}`,
+          editingTask.id,
+          0
+        )
+      }
+
+      // Snapshot old breakdown dates before deleting
+      const oldBreakdowns = [...(editingTask.breakdowns || [])]
+        .sort((a, b) => a.order_index - b.order_index)
+
       await supabase.from('breakdowns').delete().eq('task_id', editingTask.id)
 
       const valid = breakdowns.filter(b => b.title.trim())
@@ -509,6 +527,25 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
             end_date: b.end_date || null,
           }))
         )
+      }
+
+      // Log any breakdown date changes
+      const fmt = (d) => d ? new Date(d).toLocaleDateString('default', { day: 'numeric', month: 'short' }) : 'none'
+      for (const b of valid) {
+        const old = oldBreakdowns.find(o => o.title === b.title)
+        if (!old) continue
+        const oldS = old.start_date || ''
+        const oldE = old.end_date || ''
+        const newS = b.start_date || ''
+        const newE = b.end_date || ''
+        if (oldS !== newS || oldE !== newE) {
+          await logActivity(
+            user.id,
+            `Rescheduled step "${b.title}" on "${title}" — ${fmt(newS)} to ${fmt(newE)}`,
+            editingTask.id,
+            0
+          )
+        }
       }
     } else {
       const { data: task, error } = await supabase.from('tasks')

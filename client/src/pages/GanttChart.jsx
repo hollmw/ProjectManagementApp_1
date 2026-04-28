@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../supabase'
 import { useNavigate } from 'react-router-dom'
+import { logActivity } from '../utils/logActivity'
 
 const AREA_COLORS = {
   'Tech': '#6366f1',
@@ -134,6 +135,16 @@ function BreakdownScheduler({ task, onClose, onSave }) {
         start_date: b.start_date || null,
         end_date: b.end_date || null,
       }).eq('id', b.id)
+    }
+    const { data: { user } } = await supabase.auth.getUser()
+    const scheduled = breakdowns.filter(b => b.start_date && b.end_date)
+    if (scheduled.length > 0) {
+      const stepList = scheduled.map(b => {
+        const start = new Date(b.start_date).toLocaleDateString('default', { day: 'numeric', month: 'short' })
+        const end = new Date(b.end_date).toLocaleDateString('default', { day: 'numeric', month: 'short' })
+        return `"${b.title}" (${start} – ${end})`
+      }).join(', ')
+      await logActivity(user.id, `Scheduled breakdown steps for "${task.title}": ${stepList}`, task.id, 0)
     }
     onSave(task.id, breakdowns)
     setSaving(false)
@@ -428,8 +439,31 @@ export default function GanttChart() {
   const [filterArea, setFilterArea] = useState('all')
   const [expandedTasks, setExpandedTasks] = useState({})
   const [schedulingTask, setSchedulingTask] = useState(null)
+  const [sortBy, setSortBy] = useState('due_asc')
   const navigate = useNavigate()
   const containerRef = useRef(null)
+  const timelineScrollRef = useRef(null)
+  const isPanning = useRef(false)
+  const panStart = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 })
+
+  // Auto-scroll timeline to today on first render
+  useEffect(() => {
+    if (!timelineScrollRef.current) return
+    const dayWidth = 40
+    const now = new Date()
+    const allDates = tasks.flatMap(t => [
+      t.start_date ? new Date(t.start_date) : null,
+      t.due_date ? new Date(t.due_date) : null,
+      ...(t.breakdowns || []).flatMap(b => [
+        b.start_date ? new Date(b.start_date) : null,
+        b.end_date ? new Date(b.end_date) : null,
+      ])
+    ]).filter(Boolean)
+    const earliest = allDates.length > 0 ? new Date(Math.min(...allDates.map(d => d.getTime()))) : now
+    const minDate = new Date(Math.min(now.getTime() - 3 * 86400000, earliest.getTime() - 7 * 86400000))
+    const todayX = Math.floor((now - minDate) / 86400000) * dayWidth
+    timelineScrollRef.current.scrollLeft = Math.max(0, todayX - 60)
+  }, [loading, tasks])
 
   const fetchTasks = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -514,11 +548,34 @@ export default function GanttChart() {
     </div>
   )
 
-  const filteredTasks = tasks.filter(task => {
-    const matchesArea = filterArea === 'all' || task.areas?.name === filterArea
-    const matchesUser = filterUser === 'all' || task.task_assignments?.some(a => a.user_id === filterUser)
-    return matchesArea && matchesUser
-  })
+  const filteredTasks = tasks
+    .filter(task => {
+      const matchesArea = filterArea === 'all' || task.areas?.name === filterArea
+      const matchesUser = filterUser === 'all' || task.task_assignments?.some(a => a.user_id === filterUser)
+      return matchesArea && matchesUser
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'due_asc':  return new Date(a.due_date) - new Date(b.due_date)
+        case 'due_desc': return new Date(b.due_date) - new Date(a.due_date)
+        case 'start_asc':  return new Date(a.start_date || a.due_date) - new Date(b.start_date || b.due_date)
+        case 'start_desc': return new Date(b.start_date || b.due_date) - new Date(a.start_date || a.due_date)
+        case 'progress_asc': {
+          const pA = a.breakdowns?.length ? Math.round((a.breakdowns.filter(x => x.is_checked).length / a.breakdowns.length) * 100) : 0
+          const pB = b.breakdowns?.length ? Math.round((b.breakdowns.filter(x => x.is_checked).length / b.breakdowns.length) * 100) : 0
+          return pA - pB
+        }
+        case 'progress_desc': {
+          const pA = a.breakdowns?.length ? Math.round((a.breakdowns.filter(x => x.is_checked).length / a.breakdowns.length) * 100) : 0
+          const pB = b.breakdowns?.length ? Math.round((b.breakdowns.filter(x => x.is_checked).length / b.breakdowns.length) * 100) : 0
+          return pB - pA
+        }
+        case 'title_asc':  return a.title.localeCompare(b.title)
+        case 'title_desc': return b.title.localeCompare(a.title)
+        case 'area': return (a.areas?.name || '').localeCompare(b.areas?.name || '')
+        default: return 0
+      }
+    })
 
   const tasksWithNoDueDate = tasks
     .filter(t => !t.due_date)
@@ -539,14 +596,17 @@ export default function GanttChart() {
     ])
   ]).filter(Boolean)
 
-  const minDate = allDates.length > 0
-    ? new Date(Math.min(...allDates.map(d => d.getTime()), today.getTime()))
+  const earliestDataDate = allDates.length > 0
+    ? new Date(Math.min(...allDates.map(d => d.getTime())))
     : today
+  const minDate = new Date(Math.min(
+    today.getTime() - 3 * 86400000,
+    earliestDataDate.getTime() - 7 * 86400000
+  ))
+
   const maxDate = allDates.length > 0
     ? new Date(Math.max(...allDates.map(d => d.getTime())))
     : new Date(today.getTime() + 30 * 86400000)
-
-  minDate.setDate(minDate.getDate() - 7)
   maxDate.setDate(maxDate.getDate() + 7)
 
   const totalDays = Math.ceil((maxDate - minDate) / 86400000)
@@ -701,33 +761,97 @@ export default function GanttChart() {
             }}>Clear filters</button>
           )}
 
+          {/* Sort divider */}
+          <div style={{ width: '1px', height: '20px', background: '#e5e7eb', margin: '0 0.25rem' }} />
+
+          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#9ca3af' }}>Sort:</span>
+
+          <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{
+            padding: '0.4rem 0.75rem', border: '1.5px solid #e5e7eb', borderRadius: '8px',
+            fontSize: '0.82rem', background: 'white', color: '#374151', cursor: 'pointer',
+          }}>
+            <optgroup label="Due Date">
+              <option value="due_asc">Due date ↑ earliest first</option>
+              <option value="due_desc">Due date ↓ latest first</option>
+            </optgroup>
+            <optgroup label="Start Date">
+              <option value="start_asc">Start date ↑ earliest first</option>
+              <option value="start_desc">Start date ↓ latest first</option>
+            </optgroup>
+            <optgroup label="Progress">
+              <option value="progress_asc">Progress ↑ least done first</option>
+              <option value="progress_desc">Progress ↓ most done first</option>
+            </optgroup>
+            <optgroup label="Other">
+              <option value="title_asc">Title A → Z</option>
+              <option value="title_desc">Title Z → A</option>
+              <option value="area">Area</option>
+            </optgroup>
+          </select>
+
           <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto' }}>
             {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''}
           </span>
         </div>
 
         {/* Gantt area */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '1.5rem 2rem' }} ref={containerRef}>
+        <div style={{ flex: 1, overflow: 'hidden', position: 'relative', display: 'flex', flexDirection: 'column', padding: '1.5rem 2rem', gap: '1rem', minHeight: 0 }} ref={containerRef}>
           {filteredTasks.length === 0 ? (
             <div style={{
               background: 'white', borderRadius: '14px', padding: '3rem 2rem',
               textAlign: 'center', color: '#9ca3af', border: '1px solid #f1f5f9',
+              flex: 1,
             }}>
               <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>📅</div>
               <div style={{ fontSize: '0.9rem', fontWeight: 500, color: '#6b7280' }}>No tasks match your filters</div>
             </div>
           ) : (
-            <div style={{
-              display: 'flex', background: 'white', borderRadius: '14px',
-              border: '1px solid #f1f5f9', overflow: 'hidden',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            }}>
+            <div
+              ref={timelineScrollRef}
+              onMouseDown={(e) => {
+                if (e.button !== 0) return
+                if (e.target.closest('button, [data-nopan]')) return
+                isPanning.current = true
+                panStart.current = {
+                  x: e.clientX, y: e.clientY,
+                  scrollLeft: timelineScrollRef.current.scrollLeft,
+                  scrollTop: timelineScrollRef.current.scrollTop,
+                }
+                e.currentTarget.style.cursor = 'grabbing'
+                e.preventDefault()
 
-              {/* Task labels column */}
-              <div style={{ width: `${labelWidth}px`, flexShrink: 0, borderRight: '1px solid #f1f5f9' }}>
+                // Attach to window so drag works even when mouse leaves the div
+                const onMove = (ev) => {
+                  if (!isPanning.current) return
+                  const dx = ev.clientX - panStart.current.x
+                  const dy = ev.clientY - panStart.current.y
+                  timelineScrollRef.current.scrollLeft = panStart.current.scrollLeft - dx
+                  timelineScrollRef.current.scrollTop = panStart.current.scrollTop - dy
+                }
+                const onUp = () => {
+                  isPanning.current = false
+                  if (timelineScrollRef.current) timelineScrollRef.current.style.cursor = 'grab'
+                  window.removeEventListener('mousemove', onMove)
+                  window.removeEventListener('mouseup', onUp)
+                }
+                window.addEventListener('mousemove', onMove)
+                window.addEventListener('mouseup', onUp)
+              }}
+              style={{
+                display: 'flex', background: 'white',
+                borderRadius: '14px', border: '1px solid #f1f5f9',
+                overflow: 'scroll', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                flex: 1, minHeight: 0, cursor: 'grab',
+                scrollbarWidth: 'thin',
+                userSelect: 'none',
+              }}>
+
+              {/* Task labels column — sticky left, no independent scroll */}
+              <div style={{ width: `${labelWidth}px`, flexShrink: 0, borderRight: '1px solid #f1f5f9', position: 'sticky', left: 0, zIndex: 20, background: 'white' }}>
                 <div style={{
                   height: '56px', borderBottom: '1px solid #f1f5f9',
                   padding: '0 1rem', display: 'flex', alignItems: 'center',
+                  position: 'sticky', top: 0, zIndex: 25, background: 'white',
                 }}>
                   <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase' }}>Task</span>
                 </div>
@@ -798,14 +922,23 @@ export default function GanttChart() {
                     </div>
                   )
                 })}
+
+                {/* Phantom label rows */}
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <div key={`phantom-label-${i}`} style={{
+                    height: `${taskRowHeight}px`,
+                    borderBottom: '1px solid #f9fafb',
+                    background: (filteredTasks.length + i) % 2 === 0 ? 'white' : '#fafafa',
+                  }} />
+                ))}
               </div>
 
-              {/* Timeline column */}
-              <div style={{ overflow: 'auto', flex: 1 }}>
+              {/* Timeline column — no independent scroll, parent wrapper scrolls */}
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ width: `${totalDays * dayWidth}px`, position: 'relative' }}>
 
                   {/* Month headers */}
-                  <div style={{ height: '28px', position: 'relative', borderBottom: '1px solid #f1f5f9', background: '#fafafa' }}>
+                  <div style={{ height: '28px', position: 'relative', borderBottom: '1px solid #f1f5f9', background: '#fafafa', position: 'sticky', top: 0, zIndex: 15 }}>
                     {months.map((m, i) => (
                       <div key={i} style={{
                         position: 'absolute', left: m.offset,
@@ -816,7 +949,7 @@ export default function GanttChart() {
                   </div>
 
                   {/* Day headers */}
-                  <div style={{ height: '28px', position: 'relative', borderBottom: '1px solid #f1f5f9', background: '#fafafa' }}>
+                  <div style={{ height: '28px', position: 'relative', borderBottom: '1px solid #f1f5f9', background: '#fafafa', position: 'sticky', top: '28px', zIndex: 15 }}>
                     {days.map((d, i) => (
                       <div key={i} style={{
                         position: 'absolute', left: i * dayWidth, width: dayWidth,
@@ -850,10 +983,6 @@ export default function GanttChart() {
                       : Math.floor((new Date(task.due_date) - minDate) / 86400000) * dayWidth - 60
                     const endX = Math.floor((new Date(task.due_date) - minDate) / 86400000) * dayWidth + dayWidth / 2
                     const barWidth = Math.max(endX - startX, 80)
-
-                    const scheduledBreakdowns = (task.breakdowns || [])
-                      .filter(b => b.start_date && b.end_date)
-                      .sort((a, b) => a.order_index - b.order_index)
 
                     return (
                       <div key={task.id} style={{
@@ -907,7 +1036,7 @@ export default function GanttChart() {
                               position: 'absolute', right: 6, fontSize: '0.6rem',
                               color: 'rgba(255,255,255,0.8)', zIndex: 1,
                             }}>
-                              {scheduledBreakdowns.length}/{total}
+                              {checked}/{total}
                             </span>
                           )}
                         </div>
@@ -958,6 +1087,23 @@ export default function GanttChart() {
                       </div>
                     )
                   })}
+
+                  {/* Phantom rows — fills remaining vertical space so chart looks full */}
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <div key={`phantom-${i}`} style={{
+                      height: `${taskRowHeight}px`,
+                      borderBottom: '1px solid #f9fafb',
+                      background: (filteredTasks.length + i) % 2 === 0 ? 'white' : '#fafafa',
+                      position: 'relative',
+                    }}>
+                      {days.map((d, di) => (d.getDay() === 0 || d.getDay() === 6) && (
+                        <div key={di} style={{
+                          position: 'absolute', left: di * dayWidth, top: 0, bottom: 0,
+                          width: dayWidth, background: 'rgba(0,0,0,0.018)', pointerEvents: 'none',
+                        }} />
+                      ))}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
