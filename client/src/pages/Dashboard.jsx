@@ -1,151 +1,49 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { supabase } from '../supabase'
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+
 import NewTaskModal from '../components/NewTaskModal'
 import TaskCard from '../components/TaskCard'
-import UserPill from '../components/UserPill'
 
-
-const AREAS = [
-  { name: 'Tech', color: '#6366f1' },
-  { name: 'Business', color: '#f59e0b' },
-  { name: 'Marketing', color: '#ec4899' },
-  { name: 'Science', color: '#10b981' },
-  { name: 'Clinical', color: '#3b82f6' },
-  { name: 'Design', color: '#8b5cf6' },
-]
+import DashboardSidebar from './dashboard/DashboardSidebar'
+import FilterBar from './dashboard/FilterBar'
+import useDashboardData from './dashboard/useDashboardData'
+import { filterTasks, sortTasks } from './dashboard/filtering'
 
 export default function Dashboard() {
-  const [areaUsers, setAreaUsers] = useState({})
-  const [profile, setProfile] = useState(null)
+  const {
+    profile, tasks, setTasks,
+    areaUsers, fetchAreaUsers, fetchTasks,
+  } = useDashboardData()
+
   const [showModal, setShowModal] = useState(false)
-  const [tasks, setTasks] = useState([])
   const [filterArea, setFilterArea] = useState('All')
   const [filterStatus, setFilterStatus] = useState('All')
   const [search, setSearch] = useState('')
   const [editingTask, setEditingTask] = useState(null)
   const [sortBy, setSortBy] = useState('newest')
-  const navigate = useNavigate()
-
-  useEffect(() => {
-    const getProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { navigate('/login'); return }
-      const { data } = await supabase
-        .from('profiles')
-        .select('*, areas(name, color)')
-        .eq('id', user.id)
-        .single()
-      setProfile(data)
-    }
-    getProfile()
-  }, [])
-
-  const fetchTasks = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    let query = supabase
-      .from('tasks')
-      .select('*, areas(name, color), breakdowns(*), reviews(*), task_assignments(*, profiles!task_assignments_user_id_fkey(id, full_name, role))')
-      .order('created_at', { ascending: false })
-
-    if (profileData?.role === 'intern') {
-      const { data: assignedTasks } = await supabase
-        .from('task_assignments')
-        .select('task_id')
-        .eq('user_id', user.id)
-      const taskIds = assignedTasks?.map(a => a.task_id) || []
-      if (taskIds.length === 0) { setTasks([]); return }
-      query = query.in('id', taskIds)
-    }
-
-    const { data } = await query
-    setTasks(data || [])
-  }, [])
-
-  useEffect(() => {
-    fetchTasks()
-  }, [fetchTasks])
-
-  useEffect(() => {
-    const channel = supabase
-      .channel(`realtime-tasks-${profile?.id || 'guest'}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchTasks())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'breakdowns' }, () => fetchTasks())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'task_assignments' }, () => fetchTasks())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, () => fetchTasks())
-      .subscribe()
-    return () => supabase.removeChannel(channel)
-  }, [fetchTasks])
-
-  const fetchAreaUsers = async (areaName) => {
-    if (areaUsers[areaName]) return
-    const { data: areaData } = await supabase
-      .from('areas').select('id').eq('name', areaName).single()
-    if (!areaData) return
-    const { data } = await supabase
-      .from('user_areas')
-      .select('profiles(id, full_name, role)')
-      .eq('area_id', areaData.id)
-    const users = (data || []).map(d => d.profiles).filter(Boolean)
-    setAreaUsers(prev => ({ ...prev, [areaName]: users }))
-  }
 
   const handleDeleteTask = (taskId) => setTasks(prev => prev.filter(t => t.id !== taskId))
   const handleEditTask = (task) => { setEditingTask(task); setShowModal(true) }
-  const handleLogout = async () => { await supabase.auth.signOut(); navigate('/login') }
 
   const handleBreakdownToggle = (taskId, breakdownId, newChecked) => {
-    setTasks(prev => prev.map(task => {
-      if (task.id !== taskId) return task
-      return { ...task, breakdowns: task.breakdowns.map(b => b.id === breakdownId ? { ...b, is_checked: newChecked } : b) }
-    }))
+    setTasks(prev => prev.map(task =>
+      task.id !== taskId
+        ? task
+        : { ...task, breakdowns: task.breakdowns.map(b => b.id === breakdownId ? { ...b, is_checked: newChecked } : b) }
+    ))
   }
 
   const handleReviewSaved = (taskId, reviewData) => {
-    setTasks(prev => prev.map(task => task.id !== taskId ? task : { ...task, reviews: [reviewData] }))
+    setTasks(prev => prev.map(t => t.id !== taskId ? t : { ...t, reviews: [reviewData] }))
   }
 
   const handleAssignmentChange = (taskId, newAssignments) => {
-    setTasks(prev => prev.map(task => task.id !== taskId ? task : { ...task, task_assignments: newAssignments }))
+    setTasks(prev => prev.map(t => t.id !== taskId ? t : { ...t, task_assignments: newAssignments }))
   }
 
-  const filteredTasks = tasks
-    .filter(task => {
-      const matchesArea = filterArea === 'All' || task.areas?.name === filterArea
-      const total = task.breakdowns?.length || 0
-      const checked = task.breakdowns?.filter(b => b.is_checked).length || 0
-      const isComplete = total > 0 && checked === total
-      const matchesStatus =
-        filterStatus === 'All' ||
-        (filterStatus === 'Complete' && isComplete) ||
-        (filterStatus === 'Incomplete' && !isComplete)
-      const matchesSearch = task.title.toLowerCase().includes(search.toLowerCase())
-      return matchesArea && matchesStatus && matchesSearch
-    })
-    .sort((taskA, taskB) => {
-      if (sortBy === 'newest') return new Date(taskB.created_at) - new Date(taskA.created_at)
-      if (sortBy === 'oldest') return new Date(taskA.created_at) - new Date(taskB.created_at)
-      if (sortBy === 'due_date') {
-        if (!taskA.due_date) return 1
-        if (!taskB.due_date) return -1
-        return new Date(taskA.due_date) - new Date(taskB.due_date)
-      }
-      if (sortBy === 'completion') {
-        const aTotal = taskA.breakdowns?.length || 0
-        const bTotal = taskB.breakdowns?.length || 0
-        const aPercent = aTotal > 0 ? taskA.breakdowns.filter(b => b.is_checked).length / aTotal : 0
-        const bPercent = bTotal > 0 ? taskB.breakdowns.filter(b => b.is_checked).length / bTotal : 0
-        return bPercent - aPercent
-      }
-      if (sortBy === 'area') return (taskA.areas?.name || '').localeCompare(taskB.areas?.name || '')
-      return 0
-    })
+  const filteredTasks = sortTasks(
+    filterTasks(tasks, { filterArea, filterStatus, search }),
+    sortBy,
+  )
 
   if (!profile) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f8fafc' }}>
@@ -155,142 +53,14 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#f8fafc' }}>
-
-      {/* Left Sidebar */}
-      <div style={{
-        width: '260px', background: 'white',
-        borderRight: '1px solid #f1f5f9',
-        display: 'flex', flexDirection: 'column',
-        padding: '1.5rem 1rem',
-        boxShadow: '2px 0 8px rgba(0,0,0,0.03)'
-      }}>
-        {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '2rem' }}>
-          <div style={{
-            width: '32px', height: '32px', borderRadius: '8px',
-            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem'
-          }}>📋</div>
-          <div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>WorkSpace</div>
-            <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>Project Management</div>
-          </div>
-        </div>
-
-        <p style={{ fontSize: '0.7rem', fontWeight: 600, color: '#9ca3af', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          Business Areas
-        </p>
-
-        {/* All */}
-        <div
-          onClick={() => setFilterArea('All')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '0.6rem',
-            padding: '0.45rem 0.75rem', borderRadius: '8px',
-            marginBottom: '0.2rem', cursor: 'pointer', fontSize: '0.875rem',
-            background: filterArea === 'All' ? '#f3f4f6' : 'transparent',
-            fontWeight: filterArea === 'All' ? 600 : 400,
-            transition: 'background 0.15s'
-          }}
-          onMouseEnter={e => { if (filterArea !== 'All') e.currentTarget.style.background = '#f9fafb' }}
-          onMouseLeave={e => { if (filterArea !== 'All') e.currentTarget.style.background = 'transparent' }}
-        >
-          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#9ca3af', flexShrink: 0 }} />
-          All
-          <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#9ca3af', fontWeight: 500 }}>
-            {tasks.length}
-          </span>
-        </div>
-
-        {AREAS.map(area => (
-          <AreaSidebarItem
-            key={area.name}
-            area={area}
-            count={tasks.filter(t => t.areas?.name === area.name).length}
-            isSelected={filterArea === area.name}
-            onClick={() => setFilterArea(area.name)}
-            onHover={() => fetchAreaUsers(area.name)}
-            users={areaUsers[area.name] || []}
-          />
-        ))}
-
-{/* Visible to all */}
-{[
-  { label: '🏆 Leaderboard', path: '/leaderboard' },
-  { label: '📅 Gantt Chart', path: '/gantt' },
-].map(item => (
-  <div
-    key={item.path}
-    onClick={() => navigate(item.path)}
-    style={{
-      padding: '0.45rem 0.75rem', borderRadius: '8px',
-      marginBottom: '0.2rem', cursor: 'pointer', fontSize: '0.875rem',
-      transition: 'background 0.15s'
-    }}
-    onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
-    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-  >
-    {item.label}
-  </div>
-))}
-
-{/* Admin only */}
-{profile.role !== 'intern' && (
-  <div style={{ marginTop: '1rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
-    <p style={{ fontSize: '0.7rem', fontWeight: 600, color: '#9ca3af', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-      Admin
-    </p>
-    {[
-      { label: 'User Management', path: '/users' },
-      { label: 'Activity Log', path: '/activity' },
-    ].map(item => (
-      <div
-        key={item.path}
-        onClick={() => navigate(item.path)}
-        style={{
-          padding: '0.45rem 0.75rem', borderRadius: '8px',
-          marginBottom: '0.2rem', cursor: 'pointer', fontSize: '0.875rem',
-          transition: 'background 0.15s'
-        }}
-        onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
-        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-      >
-        {item.label}
-      </div>
-    ))}
-  </div>
-)}
-
-        {/* User info */}
-        <div style={{ marginTop: 'auto', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
-            <div style={{
-              width: '32px', height: '32px', borderRadius: '50%',
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-              color: 'white', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', fontSize: '0.85rem', fontWeight: 600, flexShrink: 0
-            }}>
-              {profile.full_name?.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#111827' }}>{profile.full_name}</div>
-              <div style={{ fontSize: '0.72rem', color: '#9ca3af', textTransform: 'capitalize' }}>{profile.role}</div>
-            </div>
-          </div>
-          <button onClick={handleLogout} style={{
-            width: '100%', padding: '0.45rem',
-            background: 'transparent', border: '1px solid #e5e7eb',
-            borderRadius: '8px', fontSize: '0.82rem',
-            cursor: 'pointer', color: '#6b7280',
-            transition: 'background 0.15s'
-          }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          >
-            Sign out
-          </button>
-        </div>
-      </div>
+      <DashboardSidebar
+        profile={profile}
+        tasks={tasks}
+        filterArea={filterArea}
+        setFilterArea={setFilterArea}
+        areaUsers={areaUsers}
+        fetchAreaUsers={fetchAreaUsers}
+      />
 
       {/* Main Content */}
       <div style={{ flex: 1, padding: '2rem', overflowY: 'auto', background: '#f8fafc' }}>
@@ -307,73 +77,19 @@ export default function Dashboard() {
               background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
               color: 'white', border: 'none', borderRadius: '10px',
               fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(99,102,241,0.3)'
+              boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
             }}>
               + New Task
             </button>
           )}
         </div>
 
-        {/* Filter bar */}
-        <div style={{
-          display: 'flex', gap: '0.6rem', marginBottom: '1.5rem',
-          alignItems: 'center', flexWrap: 'wrap',
-          background: 'white', padding: '0.75rem 1rem',
-          borderRadius: '12px', border: '1px solid #f1f5f9',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
-        }}>
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search tasks..."
-            style={{
-              padding: '0.45rem 0.75rem', border: '1.5px solid #e5e7eb',
-              borderRadius: '8px', fontSize: '0.85rem', width: '180px',
-              background: '#f9fafb'
-            }}
-          />
-
-          <div style={{ width: '1px', height: '20px', background: '#e5e7eb' }} />
-
-          {['All', 'Incomplete', 'Complete'].map(s => (
-            <button
-              key={s}
-              onClick={() => setFilterStatus(s)}
-              style={{
-                padding: '0.4rem 0.9rem', borderRadius: '8px', fontSize: '0.82rem',
-                cursor: 'pointer',
-                border: filterStatus === s ? 'none' : '1.5px solid #e5e7eb',
-                background: filterStatus === s ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'transparent',
-                color: filterStatus === s ? 'white' : '#6b7280',
-                fontWeight: filterStatus === s ? 600 : 400
-              }}
-            >
-              {s}
-            </button>
-          ))}
-
-          <div style={{ width: '1px', height: '20px', background: '#e5e7eb' }} />
-
-          <select
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value)}
-            style={{
-              padding: '0.45rem 0.75rem', border: '1.5px solid #e5e7eb',
-              borderRadius: '8px', fontSize: '0.82rem',
-              background: '#f9fafb', color: '#374151', cursor: 'pointer'
-            }}
-          >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-            <option value="due_date">Due date</option>
-            <option value="completion">Completion %</option>
-            <option value="area">Area</option>
-          </select>
-
-          <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto' }}>
-            {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''}
-          </span>
-        </div>
+        <FilterBar
+          search={search} setSearch={setSearch}
+          filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+          sortBy={sortBy} setSortBy={setSortBy}
+          filteredCount={filteredTasks.length}
+        />
 
         {/* Task Cards */}
         {filteredTasks.length === 0 ? (
@@ -381,7 +97,7 @@ export default function Dashboard() {
             background: 'white', borderRadius: '14px', padding: '3rem 2rem',
             textAlign: 'center', color: '#9ca3af',
             border: '1px solid #f1f5f9',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
           }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>
               {tasks.length === 0 ? '📋' : '🔍'}
@@ -417,86 +133,6 @@ export default function Dashboard() {
           onTaskCreated={fetchTasks}
           editingTask={editingTask}
         />
-      )}
-    </div>
-  )
-}
-
-function AreaSidebarItem({ area, count, isSelected, onClick, onHover, users }) {
-  const [hover, setHover] = useState(false)
-  const closeTimer = useRef(null)
-
-  const handleMouseEnter = () => {
-    clearTimeout(closeTimer.current)
-    setHover(true)
-    onHover()
-  }
-
-  const handleMouseLeave = () => {
-    closeTimer.current = setTimeout(() => setHover(false), 50)
-  }
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <div
-        onClick={onClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        style={{
-          display: 'flex', alignItems: 'center', gap: '0.6rem',
-          padding: '0.45rem 0.75rem', borderRadius: '8px',
-          marginBottom: '0.2rem', cursor: 'pointer', fontSize: '0.875rem',
-          background: isSelected ? area.color + '18' : 'transparent',
-          fontWeight: isSelected ? 600 : 400,
-          color: isSelected ? area.color : '#374151',
-          transition: 'background 0.15s'
-        }}
-      >
-        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: area.color, flexShrink: 0 }} />
-        {area.name}
-        <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#9ca3af', fontWeight: 500 }}>{count}</span>
-      </div>
-
-      {hover && (
-        <div
-          onMouseEnter={() => clearTimeout(closeTimer.current)}
-          onMouseLeave={handleMouseLeave}
-          style={{
-            position: 'absolute', left: '100%', top: 0,
-            background: 'white', border: '1px solid #e5e7eb',
-            borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-            padding: '0.85rem', minWidth: '210px',
-            zIndex: 999, marginLeft: '8px'
-          }}
-        >
-          <div style={{
-            position: 'absolute', right: '100%', top: '14px',
-            width: 0, height: 0,
-            borderTop: '6px solid transparent',
-            borderBottom: '6px solid transparent',
-            borderRight: '6px solid white'
-          }} />
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: area.color }} />
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#111827' }}>{area.name}</span>
-            <span style={{ fontSize: '0.72rem', color: '#9ca3af', marginLeft: 'auto' }}>
-              {users.length} member{users.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-
-          {users.length === 0 ? (
-            <div style={{ fontSize: '0.8rem', color: '#9ca3af', textAlign: 'center', padding: '0.5rem' }}>
-              No members assigned
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-              {users.map(user => (
-                <UserPill key={user.id} user={user} />
-              ))}
-            </div>
-          )}
-        </div>
       )}
     </div>
   )
