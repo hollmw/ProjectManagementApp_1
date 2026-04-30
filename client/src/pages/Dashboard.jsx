@@ -7,6 +7,16 @@ import DashboardSidebar from './dashboard/DashboardSidebar'
 import FilterBar from './dashboard/FilterBar'
 import useDashboardData from './dashboard/useDashboardData'
 import { filterTasks, sortTasks } from './dashboard/filtering'
+import { supabase } from '../supabase'
+
+function NotionIcon({ size = 14 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" rx="18" fill="white"/>
+      <path d="M21.2 18.9c3.4 2.8 4.7 2.6 11.1 2.2l60.4-3.6c1.3 0 .2-1.3-.4-1.5l-10.2-7.4C80.1 7.3 78 6.8 75.6 7.1L17.2 11.3c-2.2.2-2.6 1.3-1.7 2.2l5.7 5.4zM24.5 31v63.2c0 3.4 1.7 4.7 5.5 4.5l66.3-3.8c3.8-.2 4.7-2.4 4.7-5.1V26.8c0-2.7-1.1-4.1-3.4-3.9L28.4 26.5c-2.5.2-3.9 1.6-3.9 4.5zm62.8 3.8c.4 1.8 0 3.6-1.8 3.8l-3 .6v44c-2.6 1.3-5 2-7 2-3.3 0-4.1-1-6.5-4.1L47.8 54.5v36.7l6.7 1.5s0 3.6-5 3.8L34 97.4c-.4-.8 0-2.8 1.4-3.2l3.6-1V47.2L34 46.9c-.4-1.8.6-4.4 3.4-4.6l16.5-1.1 24 36.7V43.6l-5.6-.6c-.4-2.2 1.3-3.8 3.4-4l14.6-.8z" fill="black"/>
+    </svg>
+  )
+}
 
 export default function Dashboard() {
   const {

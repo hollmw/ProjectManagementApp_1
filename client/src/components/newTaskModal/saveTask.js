@@ -2,6 +2,15 @@ import { supabase } from '../../supabase'
 import { logActivity } from '../../utils/logActivity'
 import { fmtShort, fmtFull } from './utils'
 
+// ─── Fire-and-forget Notion sync (won't block the UI) ────────────────────────
+async function syncToNotion(taskId) {
+  try {
+    await supabase.functions.invoke('sync-to-notion', { body: { task_id: taskId } })
+  } catch (err) {
+    console.warn('[Notion auto-sync]', err)
+  }
+}
+
 // Persist a new or edited task plus its breakdowns. Logs activity for any
 // task-level or breakdown-level date changes when editing.
 export async function saveTask({ editingTask, fields, breakdowns }) {
@@ -13,6 +22,9 @@ export async function saveTask({ editingTask, fields, breakdowns }) {
       title, description, area_id: areaId,
       due_date: dueDate || null, start_date: startDate || null,
     }).eq('id', editingTask.id)
+
+    // Sync updated task to Notion in the background
+    syncToNotion(editingTask.id)
 
     // Log task-level date changes
     const oldStart = editingTask.start_date || ''
@@ -89,5 +101,8 @@ export async function saveTask({ editingTask, fields, breakdowns }) {
         })),
       )
     }
+
+    // Sync new task to Notion in the background (small delay so breakdowns are committed)
+    setTimeout(() => syncToNotion(task.id), 500)
   }
 }
