@@ -65,6 +65,26 @@ export default function ActivityLog() {
     )
     return true
   }
+  if (loading || !profile) return (
+  <div style={{
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    height: '100vh',
+    background: 'linear-gradient(135deg, #0f172a 0%, #1a1040 100%)',
+  }}>
+    <div style={{ textAlign: 'center' }}>
+      <div style={{
+        width: '48px', height: '48px', borderRadius: '14px', margin: '0 auto 1rem',
+        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '1.4rem', boxShadow: '0 0 24px rgba(99,102,241,0.5)',
+        animation: 'pulse 1.5s infinite',
+      }}>
+        👥
+      </div>
+      <div style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Loading activity log…</div>
+    </div>
+  </div>
+)
 
   const handleUserChange = (userId) => {
     setSelectedUser(userId)
@@ -95,42 +115,83 @@ export default function ActivityLog() {
     <div style={{ display: 'flex', height: '100vh', background: '#f3f4f6' }}>
       <AppSidebar profile={profile}>
         <SidebarSection title="Filter by user">
+          {/* All users option */}
           <div
             onClick={() => handleUserChange('all')}
             style={{
-              padding: '0.5rem 0.75rem', borderRadius: '8px',
-              marginBottom: '0.25rem', cursor: 'pointer', fontSize: '0.9rem',
-              background: selectedUser === 'all' ? '#f3f4f6' : 'transparent',
-              fontWeight: selectedUser === 'all' ? 600 : 400
+              display: 'flex', alignItems: 'center', gap: '0.6rem',
+              padding: '0.48rem 0.85rem', borderRadius: '9px',
+              marginBottom: '0.15rem', cursor: 'pointer', fontSize: '0.875rem',
+              background: selectedUser === 'all' ? 'rgba(99,102,241,0.18)' : 'transparent',
+              borderLeft: `3px solid ${selectedUser === 'all' ? '#818cf8' : 'transparent'}`,
+              color: selectedUser === 'all' ? '#a5b4fc' : '#94a3b8',
+              fontWeight: selectedUser === 'all' ? 600 : 400,
+              transition: 'all 0.15s', userSelect: 'none',
+            }}
+            onMouseEnter={e => { 
+              if (selectedUser !== 'all') {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
+                e.currentTarget.style.color = '#e2e8f0'
+              } 
+            }}
+            onMouseLeave={e => { 
+              if (selectedUser !== 'all') {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.color = '#94a3b8'
+              } 
             }}
           >
+            <div style={{ 
+              width: '7px', height: '7px', borderRadius: '50%', 
+              background: selectedUser === 'all' ? '#818cf8' : '#475569', 
+              flexShrink: 0 
+            }} />
             All users
+            <span style={{ 
+              marginLeft: 'auto', fontSize: '0.68rem', fontWeight: 600,
+              background: 'rgba(255,255,255,0.08)', color: '#64748b',
+              padding: '0.1rem 0.45rem', borderRadius: '20px',
+            }}>
+              {users.length}
+            </span>
           </div>
+
+          {/* Individual users */}
           {users.map(user => (
             <div
               key={user.id}
               onClick={() => handleUserChange(user.id)}
               style={{
                 display: 'flex', alignItems: 'center', gap: '0.6rem',
-                padding: '0.5rem 0.75rem', borderRadius: '8px',
-                marginBottom: '0.25rem', cursor: 'pointer', fontSize: '0.85rem',
-                background: selectedUser === user.id ? '#ede9fe' : 'transparent',
-                color: selectedUser === user.id ? '#7c3aed' : 'inherit'
+                padding: '0.48rem 0.85rem', borderRadius: '9px',
+                marginBottom: '0.15rem', cursor: 'pointer', fontSize: '0.875rem',
+                background: selectedUser === user.id ? 'rgba(99,102,241,0.18)' : 'transparent',
+                borderLeft: `3px solid ${selectedUser === user.id ? '#818cf8' : 'transparent'}`,
+                color: selectedUser === user.id ? '#a5b4fc' : '#94a3b8',
+                fontWeight: selectedUser === user.id ? 600 : 400,
+                transition: 'all 0.15s', userSelect: 'none',
               }}
-              onMouseEnter={e => { if (selectedUser !== user.id) e.currentTarget.style.background = '#f3f4f6' }}
-              onMouseLeave={e => { if (selectedUser !== user.id) e.currentTarget.style.background = 'transparent' }}
+              onMouseEnter={e => { 
+                if (selectedUser !== user.id) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
+                  e.currentTarget.style.color = '#e2e8f0'
+                } 
+              }}
+              onMouseLeave={e => { 
+                if (selectedUser !== user.id) {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.color = '#94a3b8'
+                } 
+              }}
             >
-              <div style={{
-                width: '24px', height: '24px', borderRadius: '50%',
-                background: '#6366f1', color: 'white',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '0.7rem', fontWeight: 600, flexShrink: 0
-              }}>
-                {user.full_name?.charAt(0).toUpperCase()}
-              </div>
+              <div style={{ 
+                width: '7px', height: '7px', borderRadius: '50%', 
+                background: selectedUser === user.id ? '#818cf8' : '#475569', 
+                flexShrink: 0 
+              }} />
               <div>
                 <div style={{ fontWeight: 500 }}>{user.full_name}</div>
-                <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>{user.role}</div>
+                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{user.role}</div>
               </div>
             </div>
           ))}

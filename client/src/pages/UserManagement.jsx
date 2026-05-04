@@ -37,8 +37,26 @@ export default function UserManagement() {
     init()
   }, [])
 
-  if (loading) return <div style={{ padding: '2rem' }}>Loading...</div>
-
+if (loading || !profile) return (
+  <div style={{
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    height: '100vh',
+    background: 'linear-gradient(135deg, #0f172a 0%, #1a1040 100%)',
+  }}>
+    <div style={{ textAlign: 'center' }}>
+      <div style={{
+        width: '48px', height: '48px', borderRadius: '14px', margin: '0 auto 1rem',
+        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '1.4rem', boxShadow: '0 0 24px rgba(99,102,241,0.5)',
+        animation: 'pulse 1.5s infinite',
+      }}>
+        👥
+      </div>
+      <div style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Loading user management…</div>
+    </div>
+  </div>
+)
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#f3f4f6' }}>
       <UserMgmtSidebar profile={profile} />
