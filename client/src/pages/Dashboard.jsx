@@ -30,6 +30,25 @@ export default function Dashboard() {
   const [search, setSearch] = useState('')
   const [editingTask, setEditingTask] = useState(null)
   const [sortBy, setSortBy] = useState('newest')
+  const [syncing, setSyncing] = useState(false)
+  const [syncProgress, setSyncProgress] = useState(null) // { done, total }
+
+  const handleSyncAll = async () => {
+    if (syncing || tasks.length === 0) return
+    setSyncing(true)
+    setSyncProgress({ done: 0, total: tasks.length })
+    for (let i = 0; i < tasks.length; i++) {
+      try {
+        await supabase.functions.invoke('sync-to-notion', { body: { task_id: tasks[i].id } })
+      } catch (e) {
+        console.warn('[Sync all] failed for task', tasks[i].id, e)
+      }
+      setSyncProgress({ done: i + 1, total: tasks.length })
+    }
+    setSyncing(false)
+    setSyncProgress(null)
+    fetchTasks()
+  }
 
   const handleDeleteTask = (taskId) => setTasks(prev => prev.filter(t => t.id !== taskId))
   const handleEditTask = (task) => { setEditingTask(task); setShowModal(true) }
@@ -81,17 +100,44 @@ export default function Dashboard() {
             <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', marginBottom: '0.2rem' }}>Task Board</h1>
             <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>Welcome back, {profile.full_name}</p>
           </div>
-          {profile.role !== 'intern' && (
-            <button onClick={() => setShowModal(true)} style={{
-              padding: '0.65rem 1.25rem',
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-              color: 'white', border: 'none', borderRadius: '10px',
-              fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
-            }}>
-              + New Task
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            {/* Sync All to Notion */}
+            <button
+              onClick={handleSyncAll}
+              disabled={syncing || tasks.length === 0}
+              title="Sync all tasks to Notion"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                padding: '0.65rem 1.1rem',
+                background: syncing ? '#f9fafb' : 'white',
+                color: '#374151', border: '1px solid #e5e7eb',
+                borderRadius: '10px', fontSize: '0.875rem',
+                fontWeight: 500, cursor: syncing ? 'default' : 'pointer',
+                opacity: tasks.length === 0 ? 0.4 : 1,
+                transition: 'box-shadow 0.15s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+              }}
+              onMouseEnter={e => { if (!syncing) e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)' }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)' }}
+            >
+              <NotionIcon size={15} />
+              {syncing && syncProgress
+                ? `Syncing ${syncProgress.done}/${syncProgress.total}…`
+                : 'Sync all to Notion'}
             </button>
-          )}
+
+            {profile.role !== 'intern' && (
+              <button onClick={() => setShowModal(true)} style={{
+                padding: '0.65rem 1.25rem',
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                color: 'white', border: 'none', borderRadius: '10px',
+                fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
+              }}>
+                + New Task
+              </button>
+            )}
+          </div>
         </div>
 
         <FilterBar

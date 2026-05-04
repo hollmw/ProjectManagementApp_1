@@ -40,14 +40,28 @@ export default function UsersTable({ users, onEdit, onChanged }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <div style={{
                     width: '36px', height: '36px', borderRadius: '50%',
-                    background: '#6366f1', color: 'white',
+                    background: user.invited_at ? '#e5e7eb' : '#6366f1',
+                    color: user.invited_at ? '#9ca3af' : 'white',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '0.85rem', fontWeight: 600, flexShrink: 0,
+                    border: user.invited_at ? '2px dashed #d1d5db' : 'none',
                   }}>
                     {user.full_name?.charAt(0).toUpperCase() || '?'}
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>{user.full_name || 'Unnamed'}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{user.full_name || 'Unnamed'}</span>
+                      {user.invited_at && (
+                        <span style={{
+                          fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.5rem',
+                          background: '#fef9c3', color: '#a16207',
+                          border: '1px solid #fde68a', borderRadius: '20px',
+                          letterSpacing: '0.01em',
+                        }}>
+                          ✉ Invite pending
+                        </span>
+                      )}
+                    </div>
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{user.email || '—'}</div>
                   </div>
                 </div>

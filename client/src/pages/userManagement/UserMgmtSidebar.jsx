@@ -11,8 +11,17 @@ export default function UserMgmtSidebar() {
       display: 'flex', flexDirection: 'column',
       padding: '1.5rem 1rem',
     }}>
-      <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.25rem' }}>WorkSpace</h2>
-      <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '2rem' }}>Project Management</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '2rem' }}>
+        <img
+          src="/src/assets/logo.png"
+          alt="DRESIO"
+          style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover' }}
+        />
+        <div>
+          <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>WorkSpace</div>
+          <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>Project Management</div>
+        </div>
+      </div>
 
       <div
         onClick={() => navigate('/dashboard')}

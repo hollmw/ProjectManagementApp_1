@@ -50,7 +50,7 @@ export async function updateUser(userId, { fullName, role, areaIds }) {
   return {}
 }
 
-export async function createUser({ email, password, fullName, role, areaIds }) {
+export async function createUser({ email, password, fullName, role, areaIds, useInvite = false }) {
   const { data: { session } } = await supabase.auth.getSession()
   const response = await fetch(`${FUNCTIONS_URL}/create-user`, {
     method: 'POST',
@@ -59,10 +59,12 @@ export async function createUser({ email, password, fullName, role, areaIds }) {
       Authorization: `Bearer ${session?.access_token}`,
     },
     body: JSON.stringify({
-      email, password,
+      email,
+      password: useInvite ? undefined : password,
       full_name: fullName,
       role,
       area_ids: areaIds,
+      use_invite: useInvite,
     }),
   })
   return response.json()

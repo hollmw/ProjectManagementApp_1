@@ -25,17 +25,22 @@ export default function DashboardSidebar({
       boxShadow: '2px 0 8px rgba(0,0,0,0.03)',
     }}>
       {/* Logo */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '2rem' }}>
-        <div style={{
-          width: '32px', height: '32px', borderRadius: '8px',
-          background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem',
-        }}>📋</div>
-        <div>
-          <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>WorkSpace</div>
-          <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>Project Management</div>
-        </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '2rem' }}>
+      <img 
+        src="/src/assets/logo.png"
+        alt="DRESIO"
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '8px',
+          objectFit: 'cover',
+        }}
+      />
+      <div>
+        <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>WorkSpace</div>
+        <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>Project Management</div>
       </div>
+    </div>
 
       <p style={{ fontSize: '0.7rem', fontWeight: 600, color: '#9ca3af', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
         Business Areas
