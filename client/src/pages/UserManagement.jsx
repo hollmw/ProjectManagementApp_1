@@ -13,6 +13,7 @@ export default function UserManagement() {
   const [showModal, setShowModal] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState(null)
   const navigate = useNavigate()
 
   const refreshUsers = async () => {
@@ -24,6 +25,12 @@ export default function UserManagement() {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { navigate('/login'); return }
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('full_name, role')
+        .eq('id', user.id)
+        .single()
+      setProfile(profileData)
       await refreshUsers()
       setAreas(await fetchAllAreas())
     }
@@ -34,7 +41,7 @@ export default function UserManagement() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#f3f4f6' }}>
-      <UserMgmtSidebar />
+      <UserMgmtSidebar profile={profile} />
 
       {/* Main content */}
       <div style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>

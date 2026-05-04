@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { useNavigate } from 'react-router-dom'
+import AppSidebar, { SidebarSection } from '../components/AppSidebar'
 
 export default function ActivityLog() {
   const [logs, setLogs] = useState([])
@@ -8,19 +9,26 @@ export default function ActivityLog() {
   const [selectedUser, setSelectedUser] = useState('all')
   const [filterType, setFilterType] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { navigate('/login'); return }
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('full_name, role')
+        .eq('id', user.id)
+        .single()
+      setProfile(profileData)
       await fetchUsers()
       await fetchLogs()
     }
     init()
   }, [])
 
-  const fetchUsers = async () => {
+  async function fetchUsers() {
     const { data } = await supabase
       .from('profiles')
       .select('id, full_name, role')
@@ -28,7 +36,7 @@ export default function ActivityLog() {
     setUsers(data || [])
   }
 
-  const fetchLogs = async (userId = null) => {
+  async function fetchLogs(userId = null) {
     setLoading(true)
     let query = supabase
       .from('activity_log')
@@ -85,57 +93,8 @@ export default function ActivityLog() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#f3f4f6' }}>
-
-      {/* Sidebar */}
-      <div style={{
-        width: '260px', background: 'white',
-        borderRight: '1px solid #e5e7eb',
-        display: 'flex', flexDirection: 'column',
-        padding: '1.5rem 1rem'
-      }}>
-        <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.25rem' }}>WorkSpace</h2>
-        <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '2rem' }}>Project Management</p>
-
-        <div
-          onClick={() => navigate('/dashboard')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '0.6rem',
-            padding: '0.5rem 0.75rem', borderRadius: '8px',
-            marginBottom: '0.25rem', cursor: 'pointer', fontSize: '0.9rem'
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-        >
-          Task Board
-        </div>
-
-        <div
-          onClick={() => navigate('/users')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '0.6rem',
-            padding: '0.5rem 0.75rem', borderRadius: '8px',
-            marginBottom: '0.25rem', cursor: 'pointer', fontSize: '0.9rem'
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-        >
-          User Management
-        </div>
-
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '0.6rem',
-          padding: '0.5rem 0.75rem', borderRadius: '8px',
-          marginBottom: '0.25rem', cursor: 'pointer', fontSize: '0.9rem',
-          background: '#ede9fe', color: '#7c3aed', fontWeight: 500
-        }}>
-          Activity Log
-        </div>
-
-        {/* User filter */}
-        <div style={{ marginTop: '1.5rem' }}>
-          <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Filter by user
-          </p>
+      <AppSidebar profile={profile}>
+        <SidebarSection title="Filter by user">
           <div
             onClick={() => handleUserChange('all')}
             style={{
@@ -175,8 +134,8 @@ export default function ActivityLog() {
               </div>
             </div>
           ))}
-        </div>
-      </div>
+        </SidebarSection>
+      </AppSidebar>
 
       {/* Main content */}
       <div style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>

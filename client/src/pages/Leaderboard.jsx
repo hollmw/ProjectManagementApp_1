@@ -40,7 +40,7 @@ export default function Leaderboard() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { navigate('/login'); return }
       const { data: profileData } = await supabase
-        .from('profiles').select('role').eq('id', user.id).single()
+        .from('profiles').select('full_name, role').eq('id', user.id).single()
       setProfile(profileData)
       await fetchLeaderboard()
     }
