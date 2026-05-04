@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import NewTaskModal from '../components/NewTaskModal'
-import TaskCard from '../components/TaskCard'
+import InternTaskGrid from './dashboard/InternTaskGrid'
 
 import DashboardSidebar from './dashboard/DashboardSidebar'
 import FilterBar from './dashboard/FilterBar'
@@ -101,8 +101,8 @@ export default function Dashboard() {
             <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>Welcome back, {profile.full_name}</p>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            {/* Sync All to Notion */}
-            <button
+            {/* Sync All to Notion — admins/members only */}
+            {profile.role !== 'intern' && <button
               onClick={handleSyncAll}
               disabled={syncing || tasks.length === 0}
               title="Sync all tasks to Notion"
@@ -124,7 +124,7 @@ export default function Dashboard() {
               {syncing && syncProgress
                 ? `Syncing ${syncProgress.done}/${syncProgress.total}…`
                 : 'Sync all to Notion'}
-            </button>
+            </button>}
 
             {profile.role !== 'intern' && (
               <button onClick={() => setShowModal(true)} style={{
@@ -140,47 +140,28 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <FilterBar
-          search={search} setSearch={setSearch}
-          filterStatus={filterStatus} setFilterStatus={setFilterStatus}
-          sortBy={sortBy} setSortBy={setSortBy}
-          filteredCount={filteredTasks.length}
-        />
-
-        {/* Task Cards */}
-        {filteredTasks.length === 0 ? (
-          <div style={{
-            background: 'white', borderRadius: '14px', padding: '3rem 2rem',
-            textAlign: 'center', color: '#9ca3af',
-            border: '1px solid #f1f5f9',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-          }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>
-              {tasks.length === 0 ? '📋' : '🔍'}
-            </div>
-            <div style={{ fontSize: '0.9rem', fontWeight: 500, color: '#6b7280' }}>
-              {tasks.length === 0 ? 'No tasks yet' : 'No tasks match your filters'}
-            </div>
-            <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
-              {tasks.length === 0 ? 'Click + New Task to create one' : 'Try adjusting your filters'}
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gap: '0.85rem' }}>
-            {filteredTasks.map(task => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onBreakdownToggle={handleBreakdownToggle}
-                onDelete={handleDeleteTask}
-                onEdit={handleEditTask}
-                onReviewSaved={handleReviewSaved}
-                onAssignmentChange={handleAssignmentChange}
-                userRole={profile.role}
-              />
-            ))}
-          </div>
+        {/* Filter bar — hidden for interns (they navigate via the phase sections) */}
+        {profile.role !== 'intern' && (
+          <FilterBar
+            search={search} setSearch={setSearch}
+            filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+            sortBy={sortBy} setSortBy={setSortBy}
+            filteredCount={filteredTasks.length}
+          />
         )}
+
+        {/* ── Cube grid for all roles ── */}
+        <InternTaskGrid
+          tasks={filteredTasks}
+          cardProps={{
+            onBreakdownToggle: handleBreakdownToggle,
+            onDelete: handleDeleteTask,
+            onEdit: handleEditTask,
+            onReviewSaved: handleReviewSaved,
+            onAssignmentChange: handleAssignmentChange,
+            userRole: profile.role,
+          }}
+        />
       </div>
 
       {showModal && (

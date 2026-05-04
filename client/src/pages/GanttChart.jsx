@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 import GanttSidebar from './gantt/GanttSidebar'
 import FilterBar from './gantt/FilterBar'
@@ -12,55 +12,64 @@ import {
   timeAgo, sortTasks, matchesFilters,
   computeDateRange, buildMonthRow, buildDayList,
 } from './gantt/utils'
+import { supabase } from '../supabase'
 
-// ─── Main Gantt Chart ──────────────────────────────────────────────────────────
+// ─── Date helper ──────────────────────────────────────────────────────────────
+function addDaysToStr(dateStr, days) {
+  if (!dateStr) return null
+  const d = new Date(dateStr + 'T00:00:00')
+  d.setDate(d.getDate() + days)
+  return d.toISOString().split('T')[0]
+}
+
+// ─── Main Gantt Chart ─────────────────────────────────────────────────────────
 export default function GanttChart() {
   const {
     profile, tasks, setTasks, users, loading,
     activityLogs, fetchActivityLog,
   } = useGanttData()
 
-  const [hoveredTask, setHoveredTask] = useState(null)
-  const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 })
-  const [filterUser, setFilterUser] = useState('all')
-  const [filterArea, setFilterArea] = useState('all')
-  const [expandedTasks, setExpandedTasks] = useState({})
+  const [hoveredTask,    setHoveredTask]    = useState(null)
+  const [hoverPos,       setHoverPos]       = useState({ x: 0, y: 0 })
+  const [filterUser,     setFilterUser]     = useState('all')
+  const [filterArea,     setFilterArea]     = useState('all')
+  const [expandedTasks,  setExpandedTasks]  = useState({})
   const [schedulingTask, setSchedulingTask] = useState(null)
-  const [selectedTask, setSelectedTask] = useState(null)
-  const [sortBy, setSortBy] = useState('due_asc')
-  const containerRef = useRef(null)
+  const [selectedTask,   setSelectedTask]   = useState(null)
+  const [sortBy,         setSortBy]         = useState('due_asc')
+
+  const containerRef      = useRef(null)
   const timelineScrollRef = useRef(null)
 
-  // Auto-scroll timeline so today is visible on first render.
-  useEffect(() => {
-    if (!timelineScrollRef.current) return
-    const now = new Date()
-    const allDates = tasks.flatMap(t => [
-      t.start_date ? new Date(t.start_date) : null,
-      t.due_date ? new Date(t.due_date) : null,
-      ...(t.breakdowns || []).flatMap(b => [
-        b.start_date ? new Date(b.start_date) : null,
-        b.end_date ? new Date(b.end_date) : null,
-      ])
-    ]).filter(Boolean)
-    const earliest = allDates.length > 0
-      ? new Date(Math.min(...allDates.map(d => d.getTime())))
-      : now
-    const minDate = new Date(Math.min(
-      now.getTime() - 3 * 86400000,
-      earliest.getTime() - 7 * 86400000,
-    ))
-    const todayX = Math.floor((now - minDate) / 86400000) * DAY_WIDTH
-    timelineScrollRef.current.scrollLeft = Math.max(0, todayX - 60)
-  }, [loading, tasks])
+  // All tasks passing the current filters (with AND without dates), sorted for display
+  const allFilteredTasks = tasks.filter(t => matchesFilters(t, { filterUser, filterArea }))
 
+  // Sort all tasks — undated tasks naturally fall to the end on date-based sorts
+  const sortedAllTasks = sortTasks(allFilteredTasks, sortBy)
+
+  // Only dated tasks matter for computing the timeline date range
+  const datedTasks = sortedAllTasks.filter(t => t.due_date)
+
+  const { minDate, maxDate, today } = computeDateRange(datedTasks)
+  const totalDays = Math.max(Math.ceil((maxDate - minDate) / 86400000), 60)
+  const months    = buildMonthRow(minDate, maxDate, DAY_WIDTH)
+  const days      = buildDayList(minDate, totalDays)
+  const todayX    = Math.floor((today - minDate) / 86400000) * DAY_WIDTH
+
+  // Auto-scroll to today on first load
+  useEffect(() => {
+    if (!timelineScrollRef.current || loading) return
+    timelineScrollRef.current.scrollLeft = Math.max(0, todayX - 80)
+  }, [loading]) // eslint-disable-line
+
+  // ── Hover helpers ──────────────────────────────────────────────────────────
   const hover = {
     onEnter: (task, e) => {
       setHoveredTask(task)
       setHoverPos({ x: e.clientX, y: e.clientY })
       fetchActivityLog(task.id)
     },
-    onMove: (e) => setHoverPos({ x: e.clientX, y: e.clientY }),
+    onMove:  e  => setHoverPos({ x: e.clientX, y: e.clientY }),
     onLeave: () => setHoveredTask(null),
   }
 
@@ -75,41 +84,62 @@ export default function GanttChart() {
     ))
   }
 
+  // ── Save dates (from bar drag/resize or label drop) ───────────────────────
+  const handleSaveDates = useCallback(async (taskId, newStart, newDue, deltaDays) => {
+    const updates = {}
+    if (newStart !== undefined) updates.start_date = newStart
+    if (newDue   !== undefined) updates.due_date   = newDue
+
+    // Optimistic local update
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId) return t
+      const updatedT = { ...t, ...updates }
+      if (deltaDays !== null && deltaDays !== 0) {
+        updatedT.breakdowns = t.breakdowns?.map(b => ({
+          ...b,
+          start_date: b.start_date ? addDaysToStr(b.start_date, deltaDays) : null,
+          end_date:   b.end_date   ? addDaysToStr(b.end_date,   deltaDays) : null,
+        }))
+      }
+      return updatedT
+    }))
+
+    // Persist task
+    await supabase.from('tasks').update(updates).eq('id', taskId)
+
+    // If moving, also shift breakdown dates in DB
+    if (deltaDays !== null && deltaDays !== 0) {
+      const task = tasks.find(t => t.id === taskId)
+      for (const b of task?.breakdowns?.filter(b => b.start_date || b.end_date) || []) {
+        const bUp = {}
+        if (b.start_date) bUp.start_date = addDaysToStr(b.start_date, deltaDays)
+        if (b.end_date)   bUp.end_date   = addDaysToStr(b.end_date,   deltaDays)
+        await supabase.from('breakdowns').update(bUp).eq('id', b.id)
+      }
+    }
+  }, [tasks, setTasks])
+
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
       <div style={{ color: '#6b7280' }}>Loading…</div>
     </div>
   )
 
-  const tasksWithDue = tasks.filter(t => t.due_date)
-  const tasksWithoutDue = tasks.filter(t => !t.due_date)
-
-  const filteredTasks = sortTasks(
-    tasksWithDue.filter(t => matchesFilters(t, { filterUser, filterArea })),
-    sortBy,
-  )
-  const tasksWithNoDueDate = tasksWithoutDue.filter(t =>
-    matchesFilters(t, { filterUser, filterArea })
-  )
-
-  const { minDate, maxDate, today } = computeDateRange(filteredTasks)
-  const totalDays = Math.ceil((maxDate - minDate) / 86400000)
-  const months = buildMonthRow(minDate, maxDate, DAY_WIDTH)
-  const days = buildDayList(minDate, totalDays)
-  const todayX = Math.floor((today - minDate) / 86400000) * DAY_WIDTH
+  const noDateCount = sortedAllTasks.filter(t => !t.due_date).length
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#f8fafc' }}>
       <GanttSidebar profile={profile} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
         {/* Header */}
         <div style={{ padding: '1.5rem 2rem', borderBottom: '1px solid #f1f5f9', background: 'white' }}>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827' }}>📅 Gantt Chart</h1>
           <p style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '0.2rem' }}>
-            {filteredTasks.length} tasks with due dates
-            {tasksWithNoDueDate.length > 0 && ` · ${tasksWithNoDueDate.length} without due date`}
-            {' · '}Click a task bar to view activity & schedule
+            {datedTasks.length} scheduled
+            {noDateCount > 0 && ` · ${noDateCount} unscheduled — drag from the left bar onto the timeline`}
+            {' · '}drag bars to reschedule
           </p>
         </div>
 
@@ -118,7 +148,7 @@ export default function GanttChart() {
           filterUser={filterUser} setFilterUser={setFilterUser}
           filterArea={filterArea} setFilterArea={setFilterArea}
           sortBy={sortBy} setSortBy={setSortBy}
-          filteredCount={filteredTasks.length}
+          filteredCount={datedTasks.length}
         />
 
         {/* Gantt area */}
@@ -130,7 +160,7 @@ export default function GanttChart() {
             padding: '1.5rem 2rem', gap: '1rem', minHeight: 0,
           }}
         >
-          {filteredTasks.length === 0 ? (
+          {sortedAllTasks.length === 0 ? (
             <div style={{
               background: 'white', borderRadius: '14px', padding: '3rem 2rem',
               textAlign: 'center', color: '#9ca3af', border: '1px solid #f1f5f9',
@@ -144,7 +174,7 @@ export default function GanttChart() {
           ) : (
             <TimelineGrid
               scrollRef={timelineScrollRef}
-              tasks={filteredTasks}
+              allTasks={sortedAllTasks}
               expandedTasks={expandedTasks}
               setExpandedTasks={setExpandedTasks}
               days={days}
@@ -155,33 +185,8 @@ export default function GanttChart() {
               today={today}
               hover={hover}
               onTaskClick={handleTaskClick}
+              onSaveDates={handleSaveDates}
             />
-          )}
-
-          {/* Tasks with no due date */}
-          {tasksWithNoDueDate.length > 0 && (
-            <div style={{
-              marginTop: '1rem', background: 'white', borderRadius: '14px',
-              border: '1px solid #f1f5f9', padding: '1rem 1.25rem',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            }}>
-              <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#9ca3af', marginBottom: '0.5rem' }}>
-                NO DUE DATE
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {tasksWithNoDueDate.map(task => (
-                  <div key={task.id} style={{
-                    padding: '0.3rem 0.75rem', borderRadius: '20px',
-                    background: (task.areas?.color || '#6366f1') + '15',
-                    color: task.areas?.color || '#6366f1',
-                    fontSize: '0.8rem', fontWeight: 500,
-                    border: `1px solid ${(task.areas?.color || '#6366f1')}30`,
-                  }}>
-                    {task.title}
-                  </div>
-                ))}
-              </div>
-            </div>
           )}
         </div>
       </div>

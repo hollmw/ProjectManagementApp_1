@@ -39,14 +39,19 @@ export function matchesFilters(task, { filterUser, filterArea }) {
   return matchesArea && matchesUser
 }
 
+// Parse a YYYY-MM-DD string as local midnight (avoids UTC-offset day shifts).
+function localMidnight(dateStr) {
+  return new Date(dateStr + 'T00:00:00')
+}
+
 // Collect every meaningful date attached to a list of tasks.
 export function collectTaskDates(tasks) {
   return tasks.flatMap(t => [
-    t.start_date ? new Date(t.start_date) : null,
-    t.due_date ? new Date(t.due_date) : null,
+    t.start_date ? localMidnight(t.start_date) : null,
+    t.due_date   ? localMidnight(t.due_date)   : null,
     ...(t.breakdowns || []).flatMap(b => [
-      b.start_date ? new Date(b.start_date) : null,
-      b.end_date ? new Date(b.end_date) : null,
+      b.start_date ? localMidnight(b.start_date) : null,
+      b.end_date   ? localMidnight(b.end_date)   : null,
     ]),
   ]).filter(Boolean)
 }
@@ -54,6 +59,7 @@ export function collectTaskDates(tasks) {
 // Compute the chart's [minDate, maxDate] envelope for a list of tasks.
 export function computeDateRange(tasks) {
   const today = new Date()
+  today.setHours(0, 0, 0, 0) // normalise to local midnight
   const allDates = collectTaskDates(tasks)
   const earliest = allDates.length > 0
     ? new Date(Math.min(...allDates.map(d => d.getTime())))
@@ -62,6 +68,7 @@ export function computeDateRange(tasks) {
     today.getTime() - 3 * 86400000,
     earliest.getTime() - 7 * 86400000,
   ))
+  minDate.setHours(0, 0, 0, 0) // keep it at local midnight
   const maxDate = allDates.length > 0
     ? new Date(Math.max(...allDates.map(d => d.getTime())))
     : new Date(today.getTime() + 30 * 86400000)
@@ -95,5 +102,5 @@ export function buildDayList(minDate, totalDays) {
 
 export function dateToX(dateStr, minDate, dayWidth) {
   if (!dateStr) return null
-  return Math.floor((new Date(dateStr) - minDate) / 86400000) * dayWidth
+  return Math.floor((new Date(dateStr + 'T00:00:00') - minDate) / 86400000) * dayWidth
 }

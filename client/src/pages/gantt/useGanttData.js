@@ -20,8 +20,7 @@ export default function useGanttData() {
     let query = supabase
       .from('tasks')
       .select('*, areas(name, color), breakdowns(*), task_assignments(user_id)')
-      .not('due_date', 'is', null)
-      .order('due_date', { ascending: true })
+      .order('created_at', { ascending: false })
 
     if (profileData?.role === 'intern') {
       const { data: assignedTasks } = await supabase
