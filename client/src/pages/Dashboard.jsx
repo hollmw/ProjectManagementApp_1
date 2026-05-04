@@ -102,7 +102,7 @@ export default function Dashboard() {
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             {/* Sync All to Notion — admins/members only */}
-            {profile.role !== 'intern' && <button
+            <button
               onClick={handleSyncAll}
               disabled={syncing || tasks.length === 0}
               title="Sync all tasks to Notion"
@@ -124,9 +124,9 @@ export default function Dashboard() {
               {syncing && syncProgress
                 ? `Syncing ${syncProgress.done}/${syncProgress.total}…`
                 : 'Sync all to Notion'}
-            </button>}
+            </button>
 
-            {profile.role !== 'intern' && (
+            
               <button onClick={() => setShowModal(true)} style={{
                 padding: '0.65rem 1.25rem',
                 background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
@@ -136,7 +136,7 @@ export default function Dashboard() {
               }}>
                 + New Task
               </button>
-            )}
+            
           </div>
         </div>
 
