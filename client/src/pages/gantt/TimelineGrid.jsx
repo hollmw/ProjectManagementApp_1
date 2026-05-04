@@ -452,7 +452,7 @@ function TimelineRow({ task, index, expandedTasks, days, minDate, hover, onClick
 function TimelineColumn({
   items, expandedTasks, days, months, minDate, today,
   totalDays, todayX, hover, onTaskClick,
-  localOverrides, onDragStart, labelDragDate, suppressNextClickRef,
+  localOverrides, onDragStart, labelDragDate, labelDragX, suppressNextClickRef,
 }) {
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
@@ -491,7 +491,7 @@ function TimelineColumn({
 
         {/* Drop-date preview line when label-dragging over the timeline */}
         {labelDragDate && (() => {
-          const dropX = Math.floor((new Date(labelDragDate + 'T00:00:00') - minDate) / 86400000) * DAY_WIDTH
+          const dropX = labelDragX ?? Math.floor((new Date(labelDragDate + 'T00:00:00') - minDate) / 86400000) * DAY_WIDTH
           return (
             <div style={{
               position: 'absolute', left: dropX, top: 0, bottom: 0, width: '2px',
@@ -626,8 +626,7 @@ export default function TimelineGrid({
   // Label-drag state (unscheduled task being dragged from the label column)
   const [labelDragging, setLabelDragging]   = useState(null) // { task, x, y }
   const [labelDragDate, setLabelDragDate]   = useState(null) // computed drop date string
-  const minDateRef = useRef(minDate)
-  minDateRef.current = minDate // always fresh
+  const [labelDragX, setLabelDragX]         = useState(null) // exact cursor x within the timeline content
 
   const items = buildItems(allTasks)
 
@@ -694,7 +693,7 @@ export default function TimelineGrid({
 
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
-  }, [onSaveDates]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [onSaveDates])
 
   // ── Label drag → drop onto timeline ───────────────────────────────────────
   const handleLabelDragStart = useCallback((e, task) => {
@@ -702,7 +701,7 @@ export default function TimelineGrid({
     setLabelDragging({ task, x: e.clientX, y: e.clientY })
     document.body.style.cursor = 'grabbing'
 
-    const getDropDate = (clientX) => {
+    const getDropTarget = (clientX) => {
       const scrollEl = scrollRef.current
       if (!scrollEl) return null
       const rect  = scrollEl.getBoundingClientRect()
@@ -710,18 +709,24 @@ export default function TimelineGrid({
       const overTimeline = clientX > rect.left + LABEL_WIDTH && clientX < rect.right
       if (!overTimeline || relX < 0) return null
       const dayIndex = Math.floor(relX / DAY_WIDTH)
-      return addDaysToStr(minDateRef.current.toISOString().split('T')[0], dayIndex)
+      return {
+        date: addDaysToStr(minDate.toISOString().split('T')[0], dayIndex),
+        x: relX
+      }
     }
 
     const onMove = (ev) => {
       setLabelDragging(prev => prev ? { ...prev, x: ev.clientX, y: ev.clientY } : null)
-      setLabelDragDate(getDropDate(ev.clientX))
+      const dropTarget = getDropTarget(ev.clientX)
+      setLabelDragDate(dropTarget?.date || null)
+      setLabelDragX(dropTarget?.x ?? null)
     }
     const onUp = async (ev) => {
       document.body.style.cursor = ''
-      const dropDate = getDropDate(ev.clientX)
+      const dropDate = getDropTarget(ev.clientX)?.date
       setLabelDragging(null)
       setLabelDragDate(null)
+      setLabelDragX(null)
       if (dropDate) {
         const startDate = dropDate
         const dueDate   = addDaysToStr(startDate, 13)
@@ -732,7 +737,7 @@ export default function TimelineGrid({
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
-  }, [onSaveDates, scrollRef])
+  }, [minDate, onSaveDates, scrollRef])
 
   return (
     <>
@@ -773,6 +778,7 @@ export default function TimelineGrid({
           localOverrides={localOverrides}
           onDragStart={handleDragStart}
           labelDragDate={labelDragDate}
+          labelDragX={labelDragX}
           suppressNextClickRef={suppressNextClickRef}
         />
       </div>
