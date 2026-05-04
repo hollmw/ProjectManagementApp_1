@@ -44,7 +44,7 @@ export default function LeaderboardSidebar({ profile }) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '2rem' }}>
         <img
-          src="/src/assets/logo.png"
+          src="/logo.png"
           alt="DRESIO"
           style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover' }}
         />

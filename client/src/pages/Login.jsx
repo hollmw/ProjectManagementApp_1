@@ -76,7 +76,7 @@ export default function Login() {
       <div style={{ position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <img 
-            src="/src/assets/logo.png" 
+            src="/logo.png" 
             alt="DRESIO Logo"
             style={{
               width: '40px',

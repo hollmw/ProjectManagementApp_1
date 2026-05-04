@@ -27,7 +27,7 @@ export default function DashboardSidebar({
       {/* Logo */}
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '2rem' }}>
       <img 
-        src="/src/assets/logo.png"
+        src="/logo.png"
         alt="DRESIO"
         style={{
           width: '32px',
