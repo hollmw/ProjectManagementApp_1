@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import AppSidebar from '../components/AppSidebar'
+import { useProfile } from '../contexts/ProfileContext'
+import { isCompleted, isOverdue } from '../utils/dateUtils'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const today = new Date()
@@ -11,18 +13,7 @@ function localDate(str) {
   return str ? new Date(str + 'T00:00:00') : null
 }
 
-function isCompleted(task) {
-  if (task.status === 'done') return true
-  const total   = task.breakdowns?.length || 0
-  const checked = task.breakdowns?.filter(b => b.is_checked).length || 0
-  return total > 0 && checked === total
-}
-
-function isOverdue(task) {
-  if (isCompleted(task)) return false
-  const due = localDate(task.due_date)
-  return due && due < today
-}
+// isOverdue and isCompleted are imported from utils/dateUtils
 
 function fmtDate(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
@@ -552,8 +543,8 @@ function DateInput({ label, value, onChange }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function UserAnalytics() {
   const navigate = useNavigate()
+  const { profile, loading: profileLoading } = useProfile()
 
-  const [profile,  setProfile]  = useState(null)
   const [tasks,    setTasks]    = useState([])
   const [users,    setUsers]    = useState([])
   const [areas,    setAreas]    = useState([])
@@ -567,34 +558,44 @@ export default function UserAnalytics() {
   const [groupBy,    setGroupBy]    = useState('user')
   const [trendDays,  setTrendDays]  = useState(30)
 
-  // ── Data fetch ──────────────────────────────────────────────────────────────
+  // ── Redirect guards ─────────────────────────────────────────────────────────
   useEffect(() => {
+    if (!profileLoading && !profile) navigate('/login')
+  }, [profileLoading, profile, navigate])
+
+  useEffect(() => {
+    if (profile?.role === 'intern') navigate('/dashboard')
+  }, [profile, navigate])
+
+  // ── Data fetch — all four queries run in parallel ───────────────────────────
+  useEffect(() => {
+    if (!profile || profile.role === 'intern') return
+
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { navigate('/login'); return }
-
-      const { data: prof } = await supabase
-        .from('profiles').select('role, full_name').eq('id', user.id).single()
-      if (prof?.role === 'intern') { navigate('/dashboard'); return }
-      setProfile(prof)
-
-      const { data: taskData } = await supabase
-        .from('tasks')
-        .select('id, title, status, due_date, start_date, areas(name, color), breakdowns(*), task_assignments(user_id)')
-        .order('created_at', { ascending: false })
-
-      const { data: userData } = await supabase
-        .from('profiles').select('id, full_name, role').order('full_name')
-
-      const { data: areaData } = await supabase
-        .from('areas').select('name, color')
+      setLoading(true)
 
       const since = new Date()
       since.setDate(since.getDate() - 60)
-      const { data: activityData } = await supabase
-        .from('activity_log').select('created_at, user_id')
-        .gte('created_at', since.toISOString())
-        .order('created_at', { ascending: true })
+
+      const [
+        { data: taskData },
+        { data: userData },
+        { data: areaData },
+        { data: activityData },
+      ] = await Promise.all([
+        supabase
+          .from('tasks')
+          .select('id, title, status, due_date, start_date, areas(name, color), breakdowns(*), task_assignments(user_id)')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('profiles').select('id, full_name, role').order('full_name'),
+        supabase
+          .from('areas').select('name, color'),
+        supabase
+          .from('activity_log').select('created_at, user_id')
+          .gte('created_at', since.toISOString())
+          .order('created_at', { ascending: true }),
+      ])
 
       setTasks(taskData || [])
       setUsers(userData || [])
@@ -602,8 +603,9 @@ export default function UserAnalytics() {
       setActivity(activityData || [])
       setLoading(false)
     }
+
     init()
-  }, [])
+  }, [profile])
 
   // ── Derived data ────────────────────────────────────────────────────────────
   const filteredTasks = useMemo(() => tasks.filter(t => {

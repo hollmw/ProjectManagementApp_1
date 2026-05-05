@@ -1,67 +1,70 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../supabase'
 
 import UserMgmtSidebar from './userManagement/UserMgmtSidebar'
 import UsersTable from './userManagement/UsersTable'
 import UserModal from './userManagement/UserModal'
 import { fetchAllUsers, fetchAllAreas } from './userManagement/api'
+import { useProfile } from '../contexts/ProfileContext'
 
 export default function UserManagement() {
-  const [users, setUsers] = useState([])
-  const [areas, setAreas] = useState([])
-  const [showModal, setShowModal] = useState(false)
-  const [editingUser, setEditingUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [profile, setProfile] = useState(null)
+  const { profile, loading: profileLoading } = useProfile()
   const navigate = useNavigate()
 
-  const refreshUsers = async () => {
-    setUsers(await fetchAllUsers())
-    setLoading(false)
-  }
+  const [users,       setUsers]       = useState([])
+  const [areas,       setAreas]       = useState([])
+  const [showModal,   setShowModal]   = useState(false)
+  const [editingUser, setEditingUser] = useState(null)
+  const [loading,     setLoading]     = useState(true)
 
+  // Redirect if not authenticated
   useEffect(() => {
+    if (!profileLoading && !profile) navigate('/login')
+  }, [profileLoading, profile, navigate])
+
+  // Parallel initial load — users and areas have no dependency on each other
+  useEffect(() => {
+    if (!profile) return
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { navigate('/login'); return }
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('full_name, role')
-        .eq('id', user.id)
-        .single()
-      setProfile(profileData)
-      await refreshUsers()
-      setAreas(await fetchAllAreas())
+      setLoading(true)
+      const [usersData, areasData] = await Promise.all([fetchAllUsers(), fetchAllAreas()])
+      setUsers(usersData)
+      setAreas(areasData)
+      setLoading(false)
     }
     init()
-  }, [])
+  }, [profile])
 
-if (loading || !profile) return (
-  <div style={{
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    height: '100vh',
-    background: 'linear-gradient(135deg, #0f172a 0%, #1a1040 100%)',
-  }}>
-    <div style={{ textAlign: 'center' }}>
-      <div style={{
-        width: '48px', height: '48px', borderRadius: '14px', margin: '0 auto 1rem',
-        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '1.4rem', boxShadow: '0 0 24px rgba(99,102,241,0.5)',
-        animation: 'pulse 1.5s infinite',
-      }}>
-        👥
+  const refreshUsers = async () => {
+    const usersData = await fetchAllUsers()
+    setUsers(usersData)
+  }
+
+  if (profileLoading || !profile) return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      height: '100vh',
+      background: 'linear-gradient(135deg, #0f172a 0%, #1a1040 100%)',
+    }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{
+          width: '48px', height: '48px', borderRadius: '14px', margin: '0 auto 1rem',
+          background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '1.4rem', boxShadow: '0 0 24px rgba(99,102,241,0.5)',
+          animation: 'pulse 1.5s infinite',
+        }}>
+          {'\u{1F465}'}
+        </div>
+        <div style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Loading user management...</div>
       </div>
-      <div style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Loading user management…</div>
     </div>
-  </div>
-)
+  )
+
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#f3f4f6' }}>
       <UserMgmtSidebar profile={profile} />
 
-      {/* Main content */}
       <div style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
           <div>
@@ -82,6 +85,7 @@ if (loading || !profile) return (
 
         <UsersTable
           users={users}
+          loading={loading}
           onEdit={(user) => { setEditingUser(user); setShowModal(true) }}
           onChanged={refreshUsers}
         />

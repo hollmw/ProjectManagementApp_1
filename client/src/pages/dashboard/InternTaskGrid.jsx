@@ -12,6 +12,30 @@ function getPhase(task) {
   return 'not_started'
 }
 
+// ─── Due date urgency helper ─────────────────────────────────────────────────
+function getDueStatus(due_date) {
+  if (!due_date) return null
+
+  const today = new Date()
+  const due = new Date(due_date + 'T00:00:00')
+
+  const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24))
+
+  if (diffDays < 0) {
+    return { label: 'Overdue', color: '#dc2626' }
+  }
+
+  if (diffDays <= 2) {
+    return { label: `Due in ${diffDays}d`, color: '#f97316' }
+  }
+
+  if (diffDays <= 5) {
+    return { label: `Due in ${diffDays}d`, color: '#eab308' }
+  }
+
+  return { label: null, color: '#9ca3af' }
+}
+
 // ─── Mini cube card ───────────────────────────────────────────────────────────
 function TaskCube({ task, isSelected, onClick }) {
   const color   = task.areas?.color || '#6366f1'
@@ -19,6 +43,8 @@ function TaskCube({ task, isSelected, onClick }) {
   const checked = task.breakdowns?.filter(b => b.is_checked).length || 0
   const percent = total > 0 ? Math.round((checked / total) * 100) : null
   const [hovered, setHovered] = useState(false)
+
+  const dueInfo = getDueStatus(task.due_date)
 
   return (
     <div
@@ -78,8 +104,35 @@ function TaskCube({ task, isSelected, onClick }) {
         </span>
       )}
 
-      {/* Progress bar or due date */}
-      {percent !== null ? (
+            {/* Due date + urgency */}
+      {task.due_date && (
+        <div style={{
+          fontSize: '0.65rem',
+          marginTop: '0.25rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <span style={{ color: '#9ca3af' }}>
+            {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'short',
+            })}
+          </span>
+
+          {dueInfo?.label && (
+            <span style={{
+              color: dueInfo.color,
+              fontWeight: 600,
+            }}>
+              {dueInfo.label}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Progress bar */}
+      {percent !== null && (
         <div style={{ marginTop: '0.15rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
             <span style={{ fontSize: '0.62rem', color: '#9ca3af' }}>{checked}/{total} steps</span>
@@ -96,12 +149,6 @@ function TaskCube({ task, isSelected, onClick }) {
               transition: 'width 0.3s',
             }} />
           </div>
-        </div>
-      ) : (
-        <div style={{ fontSize: '0.68rem', color: '#9ca3af', marginTop: '0.1rem' }}>
-          {task.due_date
-            ? `Due ${new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
-            : 'No due date'}
         </div>
       )}
     </div>
@@ -125,9 +172,8 @@ function Section({ phase, tasks, expandedId, setExpandedId, cardProps }) {
 
   return (
     <div style={{ marginBottom: '2rem' }}>
-      {/* Section header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.85rem' }}>
-        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: dot, flexShrink: 0 }} />
+        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: dot }} />
         <span style={{
           fontSize: '0.77rem', fontWeight: 700, color: '#374151',
           textTransform: 'uppercase', letterSpacing: '0.07em',
@@ -143,56 +189,28 @@ function Section({ phase, tasks, expandedId, setExpandedId, cardProps }) {
         </span>
       </div>
 
-      {/* Expanded card pinned to top of section */}
       {expandedTask && (
-        <div
-          style={{
-            position: 'relative',
-            marginBottom: '0.75rem',
-            animation: 'cubeExpand 0.18s cubic-bezier(0.34, 1.56, 0.64, 1)',
-          }}
-        >
-          {/* ✕ close button — top-right corner, red, away from title */}
+        <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
           <button
             onClick={() => setExpandedId(null)}
-            title="Collapse"
             style={{
-              position: 'absolute', 
-              top: '0rem', 
-              right: '0rem',  // Changed from left to right
+              position: 'absolute',
+              top: '0rem',
+              right: '0rem',
               zIndex: 10,
-              width: '28px', 
+              width: '28px',
               height: '28px',
               borderRadius: '50%',
               background: 'white',
-              border: '1.5px solid #fee2e2',  // Light red border
-              boxShadow: '0 1px 6px rgba(0,0,0,0.12)',
+              border: '1.5px solid #fee2e2',
               cursor: 'pointer',
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              fontSize: '0.85rem', 
-              color: '#dc2626',  // Red color
+              color: '#dc2626',
               fontWeight: 'bold',
-              transition: 'all 0.12s ease',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = '#fee2e2'  // Light red background on hover
-              e.currentTarget.style.color = '#b91c1c'  // Darker red
-              e.currentTarget.style.borderColor = '#fecaca'
-              e.currentTarget.style.transform = 'scale(1.05)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'white'
-              e.currentTarget.style.color = '#dc2626'
-              e.currentTarget.style.borderColor = '#fee2e2'
-              e.currentTarget.style.transform = 'scale(1)'
             }}
           >
             ✕
           </button>
 
-          {/* The full task card */}
           <div style={{
             borderRadius: '14px',
             border: `1.5px solid ${color}45`,
@@ -203,9 +221,8 @@ function Section({ phase, tasks, expandedId, setExpandedId, cardProps }) {
         </div>
       )}
 
-      {/* Remaining cubes */}
       {cubes.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
           {cubes.map(task => (
             <TaskCube
               key={task.id}
@@ -231,32 +248,11 @@ export default function InternTaskGrid({ tasks, cardProps }) {
   }
 
   if (!tasks.length) {
-    return (
-      <div style={{
-        background: 'white', borderRadius: '14px', padding: '3rem 2rem',
-        textAlign: 'center', border: '1px solid #f1f5f9',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-      }}>
-        <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>📋</div>
-        <div style={{ fontSize: '0.9rem', fontWeight: 500, color: '#6b7280' }}>
-          No tasks assigned to you yet
-        </div>
-        <div style={{ fontSize: '0.8rem', color: '#9ca3af', marginTop: '0.25rem' }}>
-          Ask your admin to assign tasks to your area
-        </div>
-      </div>
-    )
+    return <div>No tasks assigned</div>
   }
 
   return (
     <>
-      <style>{`
-        @keyframes cubeExpand {
-          from { opacity: 0; transform: scaleY(0.92); transform-origin: top; }
-          to   { opacity: 1; transform: scaleY(1); }
-        }
-      `}</style>
-
       {['in_progress', 'not_started', 'done'].map(phase => (
         <Section
           key={phase}

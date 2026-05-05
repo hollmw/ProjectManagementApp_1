@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { fetchUserAreas, updateUser, createUser } from './api'
+import { ROLE_COLOR_MAP as roleColors } from '../../utils/colors'
 
 const inputStyle = {
   width: '100%', padding: '0.65rem 0.85rem',
@@ -47,8 +48,6 @@ export default function UserModal({ editingUser, areas, onClose, onSaved }) {
     onClose()
     setLoading(false)
   }
-
-  const roleColors = { intern: '#f59e0b', member: '#6366f1', admin: '#10b981' }
 
   return (
     <div style={{

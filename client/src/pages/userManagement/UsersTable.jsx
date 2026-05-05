@@ -1,10 +1,5 @@
 import { deleteUser } from './api'
-
-function roleColor(role) {
-  if (role === 'admin') return { bg: '#ede9fe', color: '#7c3aed' }
-  if (role === 'member') return { bg: '#dbeafe', color: '#1d4ed8' }
-  return { bg: '#f3f4f6', color: '#6b7280' }
-}
+import { getRoleColors as roleColor } from '../../utils/colors'
 
 const TH_STYLE = {
   padding: '0.75rem 1rem', textAlign: 'left',

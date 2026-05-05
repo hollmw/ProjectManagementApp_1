@@ -1,4 +1,5 @@
 import { BADGES, rankStyle } from './badges'
+import { getRoleColors as roleStyle } from '../../utils/colors'
 
 function avatarBg(i) {
   if (i === 0) return 'linear-gradient(135deg, #f59e0b, #d97706)'
@@ -12,12 +13,6 @@ function barBg(i) {
   if (i === 1) return '#94a3b8'
   if (i === 2) return '#f97316'
   return '#6366f1'
-}
-
-function roleStyle(role) {
-  if (role === 'admin') return { bg: '#ede9fe', color: '#7c3aed' }
-  if (role === 'member') return { bg: '#dbeafe', color: '#1d4ed8' }
-  return { bg: '#f3f4f6', color: '#6b7280' }
 }
 
 function RankRow({ user, index, total, badges, isSelected, onClick, maxPoints }) {

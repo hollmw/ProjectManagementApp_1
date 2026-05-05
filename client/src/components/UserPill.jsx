@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../supabase'
+import { getRoleColors } from '../utils/colors'
 
 // Tooltip always appears above or below — never to the side.
 // Horizontally centred on the pill, clamped within the viewport.
@@ -99,8 +100,7 @@ export default function UserPill({ user, isAssigned, onClick, showAssignState = 
     setLastFetched(now)
   }
 
-  const roleColor = user.role === 'admin' ? '#7c3aed' : user.role === 'member' ? '#1d4ed8' : '#6b7280'
-  const roleBg    = user.role === 'admin' ? '#ede9fe' : user.role === 'member' ? '#dbeafe' : '#f3f4f6'
+  const { color: roleColor, bg: roleBg } = getRoleColors(user.role)
 
   return (
     <div

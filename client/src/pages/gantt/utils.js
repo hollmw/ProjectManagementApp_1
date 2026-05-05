@@ -1,12 +1,7 @@
 // Pure helpers used by the Gantt chart and its sub-components.
 
-export function timeAgo(date) {
-  const seconds = Math.floor((new Date() - new Date(date + 'Z')) / 1000)
-  if (seconds < 60) return 'just now'
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
-  return `${Math.floor(seconds / 86400)}d ago`
-}
+// Re-export from shared utils so all pages use one canonical implementation
+export { timeAgo } from '../../utils/dateUtils'
 
 export function progressPercent(breakdowns) {
   const total = breakdowns?.length || 0
