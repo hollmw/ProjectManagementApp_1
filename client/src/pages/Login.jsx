@@ -155,7 +155,7 @@ export default function Login() {
               Welcome back
             </h1>
             <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-              Sign in to your DRESIO workspace
+              Sign in to your workspace
             </p>
           </div>
 
