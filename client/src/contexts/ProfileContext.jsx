@@ -1,14 +1,12 @@
 /**
  * ProfileContext — single global auth + profile load.
  *
- * Wraps the whole app (inside BrowserRouter) so every page can call
- * useProfile() and get the cached result instead of each page doing its
- * own supabase.auth.getUser() + profiles fetch.
+ * Uses onAuthStateChange as the sole source of truth so we never call
+ * getUser() (which acquires a storage lock and races with React Strict Mode).
+ * INITIAL_SESSION fires immediately with the cached local session — no lock,
+ * no network round-trip for the initial render.
  *
  * Exposes: { user, profile, loading }
- *   - loading: true while the initial fetch is in flight
- *   - user:    Supabase auth user object (or null if not signed in)
- *   - profile: row from the profiles table with areas joined (or null)
  */
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect } from 'react'
@@ -22,41 +20,29 @@ export function ProfileProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    let cancelled = false
+    let mounted = true
 
-    const init = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (cancelled) return
-
-      if (!authUser) {
-        setLoading(false)
+    const handleSession = async (session) => {
+      if (!session?.user) {
+        if (mounted) { setUser(null); setProfile(null); setLoading(false) }
         return
       }
-
       const { data } = await supabase
         .from('profiles')
         .select('*, areas(name, color)')
-        .eq('id', authUser.id)
+        .eq('id', session.user.id)
         .single()
-
-      if (cancelled) return
-      setUser(authUser)
-      setProfile(data)
-      setLoading(false)
+      if (mounted) { setUser(session.user); setProfile(data); setLoading(false) }
     }
 
-    init()
-
-    // Keep in sync when the user signs out (or signs in via another tab)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        setUser(null)
-        setProfile(null)
-      }
-    })
+    // onAuthStateChange fires INITIAL_SESSION immediately from local storage —
+    // no network lock, safe under React Strict Mode double-invoke.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => { handleSession(session) }
+    )
 
     return () => {
-      cancelled = true
+      mounted = false
       subscription.unsubscribe()
     }
   }, [])
