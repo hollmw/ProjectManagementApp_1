@@ -10,6 +10,7 @@ import {
 } from '@dnd-kit/sortable'
 
 import { supabase } from '../supabase'
+import { useProfile } from '../contexts/ProfileContext'
 import BreakdownTimeline from './newTaskModal/BreakdownTimeline'
 import SortableBreakdown from './newTaskModal/SortableBreakdown'
 import { saveTask } from './newTaskModal/saveTask'
@@ -17,6 +18,7 @@ import { isCompleteDate } from './newTaskModal/utils'
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
 export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
+  const { profile } = useProfile()
   const [title, setTitle] = useState(editingTask?.title || '')
   const [description, setDescription] = useState(editingTask?.description || '')
   const [areaId, setAreaId] = useState(editingTask?.area_id || '')
@@ -101,6 +103,7 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
       editingTask,
       fields: { title, description, areaId, dueDate, startDate },
       breakdowns,
+      profile,
     })
     onTaskCreated()
     onClose()

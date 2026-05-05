@@ -13,7 +13,7 @@ async function syncToNotion(taskId) {
 
 // Persist a new or edited task plus its breakdowns. Logs activity for any
 // task-level or breakdown-level date changes when editing.
-export async function saveTask({ editingTask, fields, breakdowns }) {
+export async function saveTask({ editingTask, fields, breakdowns, profile }) {
   const { title, description, areaId, dueDate, startDate } = fields
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -100,6 +100,14 @@ export async function saveTask({ editingTask, fields, breakdowns }) {
           end_date: b.end_date || null,
         })),
       )
+    }
+
+    // Auto-assign the creator if they're not an admin
+    if (profile?.role !== 'admin') {
+      await supabase.from('task_assignments').insert({
+        task_id: task.id,
+        user_id: user.id,
+      })
     }
 
     // Sync new task to Notion in the background (small delay so breakdowns are committed)
