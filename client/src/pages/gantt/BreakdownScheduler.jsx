@@ -5,9 +5,11 @@ import { logActivity } from '../../utils/logActivity'
 // ─── Mini Calendar Breakdown Scheduler ────────────────────────────────────────
 // Modal that lets you place breakdown steps onto a mini-calendar by dragging.
 export default function BreakdownScheduler({ task, onClose, onSave }) {
-  const taskStart = task.start_date ? new Date(task.start_date) : new Date()
+  // Append T00:00:00 to force local-time parsing (bare "YYYY-MM-DD" parses as UTC
+  // midnight, which in UTC+ timezones gives the previous calendar day locally).
+  const taskStart = task.start_date ? new Date(task.start_date + 'T00:00:00') : new Date()
   const taskEnd = task.due_date
-    ? new Date(task.due_date)
+    ? new Date(task.due_date + 'T00:00:00')
     : new Date(taskStart.getTime() + 14 * 86400000)
 
   const totalMs = taskEnd - taskStart
@@ -37,7 +39,10 @@ export default function BreakdownScheduler({ task, onClose, onSave }) {
   const dayToDate = (day) => {
     const d = new Date(taskStart)
     d.setDate(d.getDate() + Math.max(0, Math.min(day, totalDays)))
-    return d.toISOString().split('T')[0]
+    const yyyy = d.getFullYear()
+    const mm   = String(d.getMonth() + 1).padStart(2, '0')
+    const dd   = String(d.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
   }
 
   const getBreakdownDays = (b) => ({

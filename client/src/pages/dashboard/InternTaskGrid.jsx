@@ -44,8 +44,9 @@ function TaskCube({ task, isSelected, onClick }) {
   const percent = total > 0 ? Math.round((checked / total) * 100) : null
   const [hovered, setHovered] = useState(false)
 
-  const dueInfo = getDueStatus(task.due_date)
-
+  const isComplete = percent === 100 || task.status === 'done'
+  const dueInfo = isComplete ? null : getDueStatus(task.due_date)
+  
   return (
     <div
       onClick={onClick}
