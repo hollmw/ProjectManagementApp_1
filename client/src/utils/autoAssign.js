@@ -54,7 +54,8 @@ export async function autoAssignTask(task, existingAssignments = []) {
   const currentUserId = authData?.user?.id
 
   const toInsert = []
-  let totalSkippedEarlyEnd = 0
+  let totalSkippedEarlyEnd  = 0
+  let totalSkippedLateStart = 0
 
   // Sort slots: most understaffed first (fewest filled relative to required)
   const sortedSlots = [...slots].sort((a, b) => {
@@ -83,7 +84,8 @@ export async function autoAssignTask(task, existingAssignments = []) {
     if (needed === 0) continue
 
     const eligible = []
-    let skippedEarlyEnd = 0
+    let skippedEarlyEnd  = 0
+    let skippedLateStart = 0
 
     for (const intern of (interns || [])) {
       // Must belong to the required area
@@ -95,16 +97,22 @@ export async function autoAssignTask(task, existingAssignments = []) {
       // Must not already be queued for assignment in this run
       if (toInsert.some(r => r.user_id === intern.id)) continue
 
-      // Availability: placement period must overlap task period
-      if (taskStart && taskEnd && intern.intern_start_date && intern.intern_end_date) {
+      // Availability: placement period must cover the full task period
+      if (intern.intern_start_date && intern.intern_end_date) {
         const internStart = new Date(intern.intern_start_date + 'T00:00:00')
         const internEnd   = new Date(intern.intern_end_date   + 'T00:00:00')
 
-        // No overlap at all — skip silently
-        if (internStart > taskEnd || internEnd < taskStart) continue
+        // Intern hasn't started by the time the task begins — skip with warning
+        if (taskStart && internStart > taskStart) {
+          skippedLateStart++
+          continue
+        }
 
-        // Overlaps but placement ends before the task does — skip with warning count
-        if (internEnd < taskEnd) {
+        // No overlap at all — skip silently
+        if (taskEnd && (internStart > taskEnd || internEnd < (taskStart || taskEnd))) continue
+
+        // Intern's placement ends before the task does — skip with warning
+        if (taskEnd && internEnd < taskEnd) {
           skippedEarlyEnd++
           continue
         }
@@ -113,7 +121,8 @@ export async function autoAssignTask(task, existingAssignments = []) {
       eligible.push(intern)
     }
 
-    totalSkippedEarlyEnd += skippedEarlyEnd
+    totalSkippedEarlyEnd  += skippedEarlyEnd
+    totalSkippedLateStart += skippedLateStart
 
     // Sort priority:
     //  1. Specialists first — interns whose ONLY matching area is this slot's area
@@ -139,14 +148,16 @@ export async function autoAssignTask(task, existingAssignments = []) {
   }
 
   if (toInsert.length === 0) {
-    const earlyNote = totalSkippedEarlyEnd > 0
-      ? ` (${totalSkippedEarlyEnd} skipped — placement ends before task ends)`
-      : ''
+    const notes = []
+    if (totalSkippedLateStart > 0) notes.push(`${totalSkippedLateStart} start after project`)
+    if (totalSkippedEarlyEnd  > 0) notes.push(`${totalSkippedEarlyEnd} end before project finishes`)
+    const noteStr = notes.length > 0 ? ` (${notes.join(', ')})` : ''
     return {
       assigned: 0,
       newAssignments: [],
-      message: 'No available interns found. Check placement dates match the task period and slot requirements are set.' + earlyNote,
-      skippedEarlyEnd: totalSkippedEarlyEnd,
+      message: 'No available interns found. Check placement dates match the task period and slot requirements are set.' + noteStr,
+      skippedEarlyEnd:  totalSkippedEarlyEnd,
+      skippedLateStart: totalSkippedLateStart,
     }
   }
 
@@ -155,14 +166,17 @@ export async function autoAssignTask(task, existingAssignments = []) {
     .insert(toInsert)
     .select('*, profiles!task_assignments_user_id_fkey(id, full_name, role, user_areas(area_id, areas(name, color)))')
 
-  if (error) return { assigned: 0, newAssignments: [], message: 'Database error: ' + error.message, skippedEarlyEnd: totalSkippedEarlyEnd }
+  if (error) return { assigned: 0, newAssignments: [], message: 'Database error: ' + error.message, skippedEarlyEnd: totalSkippedEarlyEnd, skippedLateStart: totalSkippedLateStart }
+
+  const notes = []
+  if (totalSkippedLateStart > 0) notes.push(`${totalSkippedLateStart} skipped (start after project)`)
+  if (totalSkippedEarlyEnd  > 0) notes.push(`${totalSkippedEarlyEnd} skipped (end before project finishes)`)
 
   return {
     assigned: inserted?.length || 0,
     newAssignments: inserted || [],
-    message: totalSkippedEarlyEnd > 0
-      ? `${totalSkippedEarlyEnd} intern${totalSkippedEarlyEnd !== 1 ? 's' : ''} skipped (placement ends before task ends)`
-      : null,
-    skippedEarlyEnd: totalSkippedEarlyEnd,
+    message: notes.length > 0 ? notes.join(' · ') : null,
+    skippedEarlyEnd:  totalSkippedEarlyEnd,
+    skippedLateStart: totalSkippedLateStart,
   }
 }

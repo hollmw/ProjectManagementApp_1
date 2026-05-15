@@ -100,6 +100,11 @@ export default function AssignmentSection({ task, assignments, setAssignments, u
     return new Date(user.intern_end_date + 'T00:00:00') < taskEnd
   }
 
+  function startsLate(user) {
+    if (!taskStart || !user.intern_start_date) return false
+    return new Date(user.intern_start_date + 'T00:00:00') > taskStart
+  }
+
   return (
     <div style={{ marginTop: '1rem', borderTop: '1px solid #f3f4f6', paddingTop: '1rem' }}>
 
@@ -276,10 +281,12 @@ export default function AssignmentSection({ task, assignments, setAssignments, u
                 const matchingArea    = userAreas.find(ua => slotAreaIds.has(ua.area_id))?.areas
                 const avatarColor     = hasMatch ? (matchingArea?.color || '#6366f1') : '#9ca3af'
 
-                // Busyness
-                const concurrent = concurrencyMap[user.id] || 0
-                const busyness   = getBusynessColor(concurrent)
-                const isEarlyEnd = endsEarly(user)
+                // Busyness + placement checks
+                const concurrent   = concurrencyMap[user.id] || 0
+                const busyness     = getBusynessColor(concurrent)
+                const isEarlyEnd   = endsEarly(user)
+                const isLateStart  = startsLate(user)
+                const placementBad = isEarlyEnd || isLateStart
 
                 return (
                   <button
@@ -288,8 +295,8 @@ export default function AssignmentSection({ task, assignments, setAssignments, u
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       padding: '0.4rem 0.65rem', borderRadius: '8px', cursor: 'pointer',
-                      border: `1px solid ${isAssigned ? '#d1fae5' : hasMatch ? '#f0f0ff' : '#f3f4f6'}`,
-                      background: isAssigned ? '#f0fdf4' : hasMatch ? '#fafafe' : '#fafafa',
+                      border: `1px solid ${isAssigned ? '#d1fae5' : placementBad ? '#fde68a' : hasMatch ? '#f0f0ff' : '#f3f4f6'}`,
+                      background: isAssigned ? '#f0fdf4' : placementBad ? '#fffbeb' : hasMatch ? '#fafafe' : '#fafafa',
                       textAlign: 'left', width: '100%',
                       opacity: hasMatch || isAssigned || slots.length === 0 ? 1 : 0.45,
                       transition: 'all 0.12s',
@@ -339,6 +346,18 @@ export default function AssignmentSection({ task, assignments, setAssignments, u
                               background: busyness.bg, color: busyness.color,
                             }}>
                               {concurrent === 0 ? 'Free' : `${concurrent} proj`}
+                            </span>
+                          )}
+
+                          {/* Late-start warning */}
+                          {isLateStart && (
+                            <span style={{
+                              fontSize: '0.6rem', padding: '0.1rem 0.35rem',
+                              borderRadius: '8px', fontWeight: 700,
+                              background: '#fef3c7', color: '#92400e',
+                              border: '1px solid #fde68a',
+                            }}>
+                              ⚠ Starts late
                             </span>
                           )}
 

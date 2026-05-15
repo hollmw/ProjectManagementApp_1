@@ -109,6 +109,16 @@ export default function TaskCard({
   const priorityBorderColor = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' }[task.priority] || '#6366f1'
   const taskAreas = task.task_areas?.length ? task.task_areas : (task.areas ? [{ area_id: task.area_id, areas: task.areas }] : [])
 
+  // Slot fill status — computed from live assignments state so it updates in real time
+  const slotStatus = (task.task_area_slots || []).map(slot => {
+    const filled = assignments.filter(a => {
+      const prof = a.profiles
+      if (!prof) return false
+      return (prof.user_areas || []).some(ua => ua.area_id === slot.area_id)
+    }).length
+    return { ...slot, filled }
+  })
+
   // Build a multi-color left strip using background gradient (4px wide)
   // Falls back to priority color when no area colors are available
   const areaColors = taskAreas.map(ta => ta.areas?.color).filter(Boolean)
@@ -180,6 +190,31 @@ export default function TaskCard({
               )
             })()}
           </div>
+
+          {/* ── Slot fill pills ── */}
+          {slotStatus.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.4rem' }}>
+              {slotStatus.map(s => {
+                const over  = s.filled > s.required_count
+                const exact = s.filled === s.required_count
+                const color = s.areas?.color || '#6366f1'
+                const style = over
+                  ? { background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }
+                  : exact
+                    ? { background: '#d1fae5', color: '#059669', border: '1px solid #a7f3d0' }
+                    : { background: color + '15', color, border: `1px solid ${color}40` }
+                return (
+                  <span key={s.area_id} style={{
+                    fontSize: '0.68rem', fontWeight: 700,
+                    padding: '0.15rem 0.5rem', borderRadius: '20px',
+                    ...style,
+                  }}>
+                    {s.areas?.name} {s.filled}/{s.required_count}{exact ? ' ✓' : over ? ' ↑' : ''}
+                  </span>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
