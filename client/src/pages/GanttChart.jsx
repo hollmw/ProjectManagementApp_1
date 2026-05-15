@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 import GanttSidebar from './gantt/GanttSidebar'
 import FilterBar from './gantt/FilterBar'
@@ -24,6 +25,7 @@ function addDaysToStr(dateStr, days) {
 
 // ─── Main Gantt Chart ─────────────────────────────────────────────────────────
 export default function GanttChart() {
+  const [searchParams] = useSearchParams()
   const {
     profile, tasks, setTasks, users, loading,
     activityLogs, fetchActivityLog,
@@ -31,7 +33,7 @@ export default function GanttChart() {
 
   const [hoveredTask,    setHoveredTask]    = useState(null)
   const [hoverPos,       setHoverPos]       = useState({ x: 0, y: 0 })
-  const [filterUser,     setFilterUser]     = useState('all')
+  const [filterUser,     setFilterUser]     = useState(searchParams.get('user') || 'all')
   const [filterArea,     setFilterArea]     = useState('all')
   const [expandedTasks,  setExpandedTasks]  = useState({})
   const [schedulingTask, setSchedulingTask] = useState(null)

@@ -8,7 +8,10 @@ function isComplete(task) {
 
 export function filterTasks(tasks, { filterArea, filterStatus, search }) {
   return tasks.filter(task => {
-    const matchesArea = filterArea === 'All' || task.areas?.name === filterArea
+    const taskAreaNames = task.task_areas?.length
+      ? task.task_areas.map(ta => ta.areas?.name).filter(Boolean)
+      : [task.areas?.name].filter(Boolean)
+    const matchesArea = filterArea === 'All' || taskAreaNames.includes(filterArea)
     const complete = isComplete(task)
     const matchesStatus =
       filterStatus === 'All' ||

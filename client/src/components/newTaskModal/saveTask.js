@@ -11,17 +11,43 @@ async function syncToNotion(taskId) {
   }
 }
 
+// Save task_area_slots — delete all existing then re-insert
+async function saveAreaSlots(taskId, areaSlots) {
+  await supabase.from('task_area_slots').delete().eq('task_id', taskId)
+  const rows = Object.entries(areaSlots)
+    .filter(([, count]) => count > 0)
+    .map(([area_id, required_count]) => ({ task_id: taskId, area_id, required_count }))
+  if (rows.length > 0) {
+    await supabase.from('task_area_slots').insert(rows)
+  }
+}
+
+// Save task_areas — delete all then re-insert
+async function saveTaskAreas(taskId, areaIds) {
+  await supabase.from('task_areas').delete().eq('task_id', taskId)
+  if (areaIds.length > 0) {
+    await supabase.from('task_areas').insert(
+      areaIds.map(area_id => ({ task_id: taskId, area_id }))
+    )
+  }
+}
+
 // Persist a new or edited task plus its breakdowns. Logs activity for any
 // task-level or breakdown-level date changes when editing.
-export async function saveTask({ editingTask, fields, breakdowns, profile }) {
-  const { title, description, areaId, dueDate, startDate } = fields
+export async function saveTask({ editingTask, fields, breakdowns, areaSlots = {}, profile }) {
+  const { title, description, selectedAreaIds = [], dueDate, startDate, priority } = fields
+  const primaryAreaId = selectedAreaIds[0] || null
   const { data: { user } } = await supabase.auth.getUser()
 
   if (editingTask) {
     await supabase.from('tasks').update({
-      title, description, area_id: areaId,
+      title, description, area_id: primaryAreaId,
       due_date: dueDate || null, start_date: startDate || null,
+      priority: priority || 'medium',
     }).eq('id', editingTask.id)
+
+    await saveTaskAreas(editingTask.id, selectedAreaIds)
+    await saveAreaSlots(editingTask.id, areaSlots)
 
     // Sync updated task to Notion in the background
     syncToNotion(editingTask.id)
@@ -81,13 +107,16 @@ export async function saveTask({ editingTask, fields, breakdowns, profile }) {
   // Create flow
   const { data: task, error } = await supabase.from('tasks')
     .insert({
-      title, description, area_id: areaId,
+      title, description, area_id: primaryAreaId,
       due_date: dueDate || null, start_date: startDate || null,
+      priority: priority || 'medium',
       created_by: user.id,
     })
     .select().single()
 
   if (!error && task) {
+    await saveTaskAreas(task.id, selectedAreaIds)
+    await saveAreaSlots(task.id, areaSlots)
     const valid = breakdowns.filter(b => b.title.trim())
     if (valid.length > 0) {
       await supabase.from('breakdowns').insert(

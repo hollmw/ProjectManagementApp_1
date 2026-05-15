@@ -17,7 +17,7 @@ export default function useDashboardData() {
 
     let query = supabase
       .from('tasks')
-      .select('*, areas(name, color), breakdowns(*), reviews(*), task_assignments(*, profiles!task_assignments_user_id_fkey(id, full_name, role))')
+      .select('*, areas(name, color), task_areas(area_id, areas(name, color)), breakdowns(*), reviews(*), task_assignments(*, profiles!task_assignments_user_id_fkey(id, full_name, role, user_areas(area_id, areas(name, color)))), task_area_slots(*, areas(name, color))')
       .order('created_at', { ascending: false })
 
     if (profile.role === 'intern') {

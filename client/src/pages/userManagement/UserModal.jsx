@@ -10,14 +10,16 @@ const inputStyle = {
 }
 
 export default function UserModal({ editingUser, areas, onClose, onSaved }) {
-  const [fullName, setFullName]           = useState(editingUser?.full_name || '')
-  const [email, setEmail]                 = useState('')
-  const [password, setPassword]           = useState('')
-  const [showPassword, setShowPassword]   = useState(false)
-  const [role, setRole]                   = useState(editingUser?.role || 'intern')
-  const [selectedAreas, setSelectedAreas] = useState([])
-  const [loading, setLoading]             = useState(false)
-  const [error, setError]                 = useState('')
+  const [fullName, setFullName]               = useState(editingUser?.full_name || '')
+  const [email, setEmail]                     = useState('')
+  const [password, setPassword]               = useState('')
+  const [showPassword, setShowPassword]       = useState(false)
+  const [role, setRole]                       = useState(editingUser?.role || 'intern')
+  const [selectedAreas, setSelectedAreas]     = useState([])
+  const [internStartDate, setInternStartDate] = useState(editingUser?.intern_start_date || '')
+  const [internEndDate, setInternEndDate]     = useState(editingUser?.intern_end_date || '')
+  const [loading, setLoading]                 = useState(false)
+  const [error, setError]                     = useState('')
 
   useEffect(() => {
     if (editingUser) fetchUserAreas(editingUser.id).then(setSelectedAreas)
@@ -35,12 +37,12 @@ export default function UserModal({ editingUser, areas, onClose, onSaved }) {
     setError('')
 
     if (editingUser) {
-      const result = await updateUser(editingUser.id, { fullName, role, areaIds: selectedAreas })
+      const result = await updateUser(editingUser.id, { fullName, role, areaIds: selectedAreas, internStartDate, internEndDate })
       if (result.error) { setError(result.error); setLoading(false); return }
     } else {
       if (!email) { setError('Email is required'); setLoading(false); return }
       if (!password) { setError('Password is required'); setLoading(false); return }
-      const result = await createUser({ email, password, fullName, role, areaIds: selectedAreas })
+      const result = await createUser({ email, password, fullName, role, areaIds: selectedAreas, internStartDate, internEndDate })
       if (result.error) { setError(result.error); setLoading(false); return }
     }
 
@@ -211,6 +213,39 @@ export default function UserModal({ editingUser, areas, onClose, onSaved }) {
             </p>
           )}
         </div>
+
+        {/* Intern placement dates — only shown when role is intern */}
+        {role === 'intern' && (
+          <div style={{ marginBottom: '1.5rem', padding: '0.85rem 1rem', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px' }}>
+            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#92400e', marginBottom: '0.65rem' }}>
+              📅 Placement Period
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Start Date</label>
+                <input
+                  type="date"
+                  value={internStartDate}
+                  onChange={e => setInternStartDate(e.target.value)}
+                  style={{ ...inputStyle, fontSize: '0.85rem' }}
+                  onFocus={e => e.target.style.borderColor = '#f59e0b'}
+                  onBlur={e => e.target.style.borderColor = '#e5e7eb'}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>End Date</label>
+                <input
+                  type="date"
+                  value={internEndDate}
+                  onChange={e => setInternEndDate(e.target.value)}
+                  style={{ ...inputStyle, fontSize: '0.85rem' }}
+                  onFocus={e => e.target.style.borderColor = '#f59e0b'}
+                  onBlur={e => e.target.style.borderColor = '#e5e7eb'}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: '0.75rem' }}>

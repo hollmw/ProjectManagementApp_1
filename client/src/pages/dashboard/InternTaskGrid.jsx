@@ -38,7 +38,10 @@ function getDueStatus(due_date) {
 
 // ─── Mini cube card ───────────────────────────────────────────────────────────
 function TaskCube({ task, isSelected, onClick }) {
-  const color   = task.areas?.color || '#6366f1'
+  const taskAreas = task.task_areas?.length
+    ? task.task_areas
+    : (task.areas ? [{ area_id: task.area_id, areas: task.areas }] : [])
+  const color = taskAreas[0]?.areas?.color || '#6366f1'
   const total   = task.breakdowns?.length || 0
   const checked = task.breakdowns?.filter(b => b.is_checked).length || 0
   const percent = total > 0 ? Math.round((checked / total) * 100) : null
@@ -57,8 +60,10 @@ function TaskCube({ task, isSelected, onClick }) {
         minHeight: '148px',
         background: 'white',
         borderRadius: '12px',
-        border: `1.5px solid ${isSelected ? color : hovered ? color + '88' : '#e5e7eb'}`,
         borderTop: `3px solid ${color}`,
+        borderRight: `1.5px solid ${isSelected ? color : hovered ? color + '88' : '#e5e7eb'}`,
+        borderBottom: `1.5px solid ${isSelected ? color : hovered ? color + '88' : '#e5e7eb'}`,
+        borderLeft: `1.5px solid ${isSelected ? color : hovered ? color + '88' : '#e5e7eb'}`,
         cursor: 'pointer',
         padding: '0.85rem 0.8rem 0.8rem',
         display: 'flex',
@@ -89,20 +94,26 @@ function TaskCube({ task, isSelected, onClick }) {
         {task.title}
       </div>
 
-      {/* Area chip */}
-      {task.areas?.name && (
-        <span style={{
-          fontSize: '0.68rem',
-          padding: '0.12rem 0.5rem',
-          background: color + '18',
-          color,
-          borderRadius: '10px',
-          fontWeight: 500,
-          display: 'inline-block',
-          width: 'fit-content',
-        }}>
-          {task.areas.name}
-        </span>
+      {/* Area chips — one per business area */}
+      {taskAreas.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+          {taskAreas.map(ta => {
+            const area = ta.areas
+            if (!area) return null
+            return (
+              <span key={ta.area_id} style={{
+                fontSize: '0.65rem',
+                padding: '0.1rem 0.45rem',
+                background: (area.color || '#6366f1') + '18',
+                color: area.color || '#6366f1',
+                borderRadius: '10px',
+                fontWeight: 500,
+              }}>
+                {area.name}
+              </span>
+            )
+          })}
+        </div>
       )}
 
             {/* Due date + urgency */}
@@ -169,7 +180,7 @@ function Section({ phase, tasks, expandedId, setExpandedId, cardProps }) {
 
   const expandedTask = tasks.find(t => t.id === expandedId)
   const cubes        = tasks.filter(t => t.id !== expandedId)
-  const color        = expandedTask?.areas?.color || '#6366f1'
+  const color        = expandedTask?.task_areas?.[0]?.areas?.color || expandedTask?.areas?.color || '#6366f1'
 
   return (
     <div style={{ marginBottom: '2rem' }}>

@@ -585,12 +585,14 @@ export default function UserAnalytics() {
       ] = await Promise.all([
         supabase
           .from('tasks')
-          .select('id, title, status, due_date, start_date, areas(name, color), breakdowns(*), task_assignments(user_id)')
+          .select('id, title, status, due_date, start_date, areas(name, color), breakdowns(*), task_assignments(user_id), task_area_slots(area_id, required_count, areas(name, color))')
           .order('created_at', { ascending: false }),
         supabase
-          .from('profiles').select('id, full_name, role').order('full_name'),
+          .from('profiles')
+          .select('id, full_name, role, intern_start_date, intern_end_date, user_areas(area_id, areas(name, color))')
+          .order('full_name'),
         supabase
-          .from('areas').select('name, color'),
+          .from('areas').select('id, name, color'),
         supabase
           .from('activity_log').select('created_at, user_id')
           .gte('created_at', since.toISOString())
@@ -681,7 +683,89 @@ export default function UserAnalytics() {
     }).filter(r => r.total > 0)
   }, [filteredTasks, users, areas, groupBy])
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Allocation analytics (intern-specific) — must stay ABOVE any early return ─
+  const allocationData = useMemo(() => {
+    const interns = users.filter(u => u.role === 'intern')
+
+    // 1. Slot coverage per area — total required vs filled across all tasks
+    const slotsByArea = {}
+    tasks.forEach(task => {
+      const assigned = task.task_assignments || []
+      ;(task.task_area_slots || []).forEach(slot => {
+        const areaId   = slot.area_id
+        const areaName = slot.areas?.name  || 'Unknown'
+        const color    = slot.areas?.color || '#6366f1'
+        if (!slotsByArea[areaId]) slotsByArea[areaId] = { areaId, areaName, color, required: 0, filled: 0 }
+        slotsByArea[areaId].required += slot.required_count
+        // Count assigned users who belong to this area
+        const filledCount = assigned.filter(a => {
+          const user = users.find(u => u.id === a.user_id)
+          return user && (user.user_areas || []).some(ua => ua.area_id === areaId)
+        }).length
+        slotsByArea[areaId].filled += Math.min(filledCount, slot.required_count)
+      })
+    })
+    const slotCoverage = Object.values(slotsByArea).sort((a, b) => b.required - a.required)
+
+    // 2. Intern utilization — % of placement period covered by at least one active task
+    const internUtilization = interns.map(intern => {
+      if (!intern.intern_start_date || !intern.intern_end_date) {
+        return { id: intern.id, name: intern.full_name, util: null, taskCount: 0, areas: intern.user_areas || [] }
+      }
+      const pStart = new Date(intern.intern_start_date + 'T00:00:00')
+      const pEnd   = new Date(intern.intern_end_date   + 'T00:00:00')
+      const totalDays = Math.max(1, Math.ceil((pEnd - pStart) / 86400000))
+
+      // Find tasks assigned to this intern that overlap the placement
+      const internTasks = tasks.filter(t =>
+        (t.task_assignments || []).some(a => a.user_id === intern.id) &&
+        t.start_date && t.due_date
+      )
+
+      // Build a Set of covered day indices to avoid double-counting overlapping tasks
+      const coveredDays = new Set()
+      internTasks.forEach(t => {
+        const tStart = new Date(Math.max(new Date(t.start_date + 'T00:00:00'), pStart))
+        const tEnd   = new Date(Math.min(new Date(t.due_date   + 'T00:00:00'), pEnd))
+        for (let d = new Date(tStart); d <= tEnd; d.setDate(d.getDate() + 1)) {
+          coveredDays.add(d.toISOString().split('T')[0])
+        }
+      })
+
+      return {
+        id: intern.id,
+        name: intern.full_name,
+        util: pct(coveredDays.size, totalDays),
+        taskCount: internTasks.length,
+        areas: intern.user_areas || [],
+        placementDays: totalDays,
+      }
+    }).sort((a, b) => (b.util ?? -1) - (a.util ?? -1))
+
+    // 3. Capacity vs demand per area
+    const capacityByArea = areas.map(area => {
+      const availableInterns = interns.filter(u =>
+        (u.user_areas || []).some(ua => ua.area_id === area.id)
+      ).length
+      const totalDemand = tasks.reduce((sum, t) => {
+        const slot = (t.task_area_slots || []).find(s => s.area_id === area.id)
+        return sum + (slot?.required_count || 0)
+      }, 0)
+      return { areaId: area.id, areaName: area.name, color: area.color, availableInterns, totalDemand }
+    }).filter(a => a.availableInterns > 0 || a.totalDemand > 0)
+
+    // 4. Summary stats
+    const unassigned = interns.filter(u => !tasks.some(t => (t.task_assignments || []).some(a => a.user_id === u.id))).length
+    const totalRequired = slotCoverage.reduce((s, a) => s + a.required, 0)
+    const totalFilled   = slotCoverage.reduce((s, a) => s + a.filled,   0)
+    const overallFillRate = pct(totalFilled, totalRequired)
+
+    return { slotCoverage, internUtilization, capacityByArea, unassigned, overallFillRate, totalRequired, totalFilled, internCount: interns.length }
+  }, [tasks, users, areas])
+
+  const hasActiveFilters = filterArea !== 'all' || filterUser !== 'all' || dateFrom || dateTo
+
+  // ── Early return after all hooks ─────────────────────────────────────────────
   if (loading || !profile) return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -694,7 +778,6 @@ export default function UserAnalytics() {
           background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '1.4rem', boxShadow: '0 0 24px rgba(99,102,241,0.5)',
-          animation: 'pulse 1.5s infinite',
         }}>
           📊
         </div>
@@ -702,8 +785,6 @@ export default function UserAnalytics() {
       </div>
     </div>
   )
-
-  const hasActiveFilters = filterArea !== 'all' || filterUser !== 'all' || dateFrom || dateTo
 
   const areaOptions  = [{ value: 'all', label: 'All areas' },  ...areas.map(a => ({ value: a.name, label: a.name }))]
   const userOptions  = [{ value: 'all', label: 'All users' },  ...users.map(u => ({ value: u.id,   label: u.full_name }))]
@@ -779,8 +860,16 @@ export default function UserAnalytics() {
               sub={filteredTasks.length > 0 ? `${pct(stats.overdueCt, filteredTasks.length)}% of all tasks` : undefined}
             />
             <StatCard
-              label="Avg Tasks / User" value={stats.avgTasks} icon="📋"
-              gradient="linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)"
+              label="Slot Fill Rate" value={`${allocationData.overallFillRate}%`} icon="🎯"
+              gradient="linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%)"
+              sub={`${allocationData.totalFilled}/${allocationData.totalRequired} slots filled`}
+            />
+            <StatCard
+              label="Unassigned Interns" value={allocationData.unassigned} icon="🔴"
+              gradient={allocationData.unassigned > 0
+                ? 'linear-gradient(135deg, #f97316 0%, #fb923c 100%)'
+                : 'linear-gradient(135deg, #10b981 0%, #34d399 100%)'}
+              sub={`of ${allocationData.internCount} total interns`}
             />
             <StatCard
               label="Active Today" value={stats.activeToday} icon="⚡"
@@ -852,6 +941,134 @@ export default function UserAnalytics() {
             accent="#10b981"
           >
             <MetricsTable rows={tableRows} groupBy={groupBy} />
+          </Section>
+
+          {/* ── Allocation analytics ── */}
+          <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+
+            {/* Slot coverage by area */}
+            <Section title="Slot coverage by area" accent="#0ea5e9">
+              {allocationData.slotCoverage.length === 0 ? (
+                <div style={{ color: '#9ca3af', fontSize: '0.85rem', padding: '1rem 0' }}>No slot requirements set on any task yet.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  {allocationData.slotCoverage.map(a => {
+                    const rate = pct(a.filled, a.required)
+                    return (
+                      <div key={a.areaId}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: a.color }} />
+                            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#1e293b' }}>{a.areaName}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{a.filled}/{a.required} filled</span>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: rate === 100 ? '#10b981' : rate >= 60 ? '#6366f1' : '#f59e0b', minWidth: 32, textAlign: 'right' }}>{rate}%</span>
+                          </div>
+                        </div>
+                        <div style={{ height: 8, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${rate}%`, borderRadius: 4, transition: 'width 0.4s', background: rate === 100 ? '#10b981' : a.color }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </Section>
+
+            {/* Capacity vs demand */}
+            <Section title="Intern capacity vs demand" accent="#8b5cf6">
+              {allocationData.capacityByArea.length === 0 ? (
+                <div style={{ color: '#9ca3af', fontSize: '0.85rem', padding: '1rem 0' }}>No intern area data available.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  {allocationData.capacityByArea.map(a => {
+                    const isOver = a.availableInterns < a.totalDemand
+                    return (
+                      <div key={a.areaId}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: a.color }} />
+                            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#1e293b' }}>{a.areaName}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.4rem', borderRadius: 6, background: a.color + '15', color: a.color, fontWeight: 600 }}>
+                              {a.availableInterns} intern{a.availableInterns !== 1 ? 's' : ''}
+                            </span>
+                            <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>vs</span>
+                            <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.4rem', borderRadius: 6, background: isOver ? '#fef2f2' : '#f0fdf4', color: isOver ? '#ef4444' : '#10b981', fontWeight: 600 }}>
+                              {a.totalDemand} slot{a.totalDemand !== 1 ? 's' : ''}
+                            </span>
+                            {isOver && <span title="Demand exceeds capacity" style={{ fontSize: '0.7rem' }}>⚠️</span>}
+                          </div>
+                        </div>
+                        {/* Dual bar: interns (solid) vs demand (outline) */}
+                        <div style={{ height: 8, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
+                          <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', borderRadius: 4, background: a.color, width: `${Math.min(100, pct(a.availableInterns, Math.max(a.availableInterns, a.totalDemand)))}%`, opacity: 0.7 }} />
+                          <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', borderRadius: 4, border: `1.5px solid ${isOver ? '#ef4444' : '#10b981'}`, width: `${pct(a.totalDemand, Math.max(a.availableInterns, a.totalDemand))}%`, background: 'transparent' }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </Section>
+          </div>
+
+          {/* Intern utilization */}
+          <Section title="Intern utilisation" accent="#f59e0b">
+            {allocationData.internUtilization.length === 0 ? (
+              <div style={{ color: '#9ca3af', fontSize: '0.85rem', padding: '1rem 0' }}>No interns found.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+                {allocationData.internUtilization.map(intern => {
+                  const areaColor = intern.areas[0]?.areas?.color || '#6366f1'
+                  const util = intern.util
+                  const noPlacement = util === null
+                  return (
+                    <div key={intern.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      {/* Avatar */}
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: areaColor + '25', color: areaColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.72rem', fontWeight: 700, flexShrink: 0, border: `1.5px solid ${areaColor}50` }}>
+                        {intern.name?.charAt(0).toUpperCase()}
+                      </div>
+                      {/* Name + area chips */}
+                      <div style={{ minWidth: 160, flexShrink: 0 }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e293b' }}>{intern.name}</div>
+                        <div style={{ display: 'flex', gap: '0.2rem', marginTop: '0.1rem' }}>
+                          {intern.areas.slice(0, 3).map(ua => (
+                            <span key={ua.area_id} style={{ fontSize: '0.58rem', padding: '0.05rem 0.3rem', background: (ua.areas?.color || '#6366f1') + '20', color: ua.areas?.color || '#6366f1', borderRadius: 6, fontWeight: 600 }}>
+                              {ua.areas?.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Bar */}
+                      <div style={{ flex: 1, height: 10, background: '#f1f5f9', borderRadius: 5, overflow: 'hidden' }}>
+                        {noPlacement ? (
+                          <div style={{ height: '100%', background: 'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, #f1f5f9 3px, #f1f5f9 6px)', borderRadius: 5 }} />
+                        ) : (
+                          <div style={{ height: '100%', width: `${util}%`, borderRadius: 5, background: util >= 80 ? '#10b981' : util >= 50 ? '#f59e0b' : '#6366f1', transition: 'width 0.4s' }} />
+                        )}
+                      </div>
+                      {/* % label */}
+                      <div style={{ minWidth: 48, textAlign: 'right', fontSize: '0.75rem', fontWeight: 700, color: noPlacement ? '#9ca3af' : util >= 80 ? '#10b981' : util >= 50 ? '#f59e0b' : '#6366f1' }}>
+                        {noPlacement ? 'No dates' : `${util}%`}
+                      </div>
+                      {/* Task count */}
+                      <div style={{ minWidth: 52, textAlign: 'right', fontSize: '0.7rem', color: '#94a3b8' }}>
+                        {intern.taskCount} task{intern.taskCount !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+                  )
+                })}
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', fontSize: '0.68rem', color: '#94a3b8', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: 2, background: '#10b981', display: 'inline-block' }} />≥80% utilised</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: 2, background: '#f59e0b', display: 'inline-block' }} />50–79%</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: 2, background: '#6366f1', display: 'inline-block' }} />&lt;50%</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 12, height: 8, borderRadius: 2, background: 'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, #f1f5f9 3px, #f1f5f9 6px)', display: 'inline-block' }} />No placement dates set</span>
+                </div>
+              </div>
+            )}
           </Section>
 
           <div style={{ height: '1.5rem' }} />

@@ -9,9 +9,10 @@ const PRIMARY_NAV = [
 ]
 
 const ADMIN_NAV = [
-  { label: 'User Management', path: '/users',     icon: '👥' },
-  { label: 'Activity Log',    path: '/activity',  icon: '📜' },
-  { label: 'User Analytics',  path: '/analytics', icon: '📊' },
+  { label: 'User Management',  path: '/users',            icon: '👥' },
+  { label: 'Intern Timeline',  path: '/intern-timeline',  icon: '🗓' },
+  { label: 'Activity Log',     path: '/activity',         icon: '📜' },
+  { label: 'User Analytics',   path: '/analytics',        icon: '📊' },
 ]
 
 function NavItem({ item, active, onClick }) {

@@ -44,7 +44,7 @@ export default function UsersTable({ users, onEdit, onChanged }) {
                     {user.full_name?.charAt(0).toUpperCase() || '?'}
                   </div>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{user.full_name || 'Unnamed'}</span>
                       {user.invited_at && (
                         <span style={{
@@ -54,6 +54,15 @@ export default function UsersTable({ users, onEdit, onChanged }) {
                           letterSpacing: '0.01em',
                         }}>
                           ✉ Invite pending
+                        </span>
+                      )}
+                      {user.role === 'intern' && (user.assignment_count || 0) === 0 && (
+                        <span style={{
+                          fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.5rem',
+                          background: '#fef2f2', color: '#dc2626',
+                          border: '1px solid #fecaca', borderRadius: '20px',
+                        }}>
+                          Unassigned
                         </span>
                       )}
                     </div>

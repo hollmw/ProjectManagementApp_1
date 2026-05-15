@@ -13,9 +13,20 @@ export async function fetchAllUsers() {
     .from('profiles')
     .select('id, email')
 
+  // Fetch assignment counts per user
+  const { data: assignments } = await supabase
+    .from('task_assignments')
+    .select('user_id')
+
+  const assignmentCounts = {}
+  ;(assignments || []).forEach(a => {
+    assignmentCounts[a.user_id] = (assignmentCounts[a.user_id] || 0) + 1
+  })
+
   return (profiles || []).map(p => ({
     ...p,
     email: p.email || authUsers?.find(u => u.id === p.id)?.email,
+    assignment_count: assignmentCounts[p.id] || 0,
   }))
 }
 
@@ -33,11 +44,19 @@ export async function deleteUser(userId) {
   return response.json()
 }
 
-// Edit existing profile (name + role + areas).
-export async function updateUser(userId, { fullName, role, areaIds }) {
+// Edit existing profile (name + role + areas + intern dates).
+export async function updateUser(userId, { fullName, role, areaIds, internStartDate, internEndDate }) {
+  const updates = { full_name: fullName, role }
+  if (role === 'intern') {
+    updates.intern_start_date = internStartDate || null
+    updates.intern_end_date   = internEndDate   || null
+  } else {
+    updates.intern_start_date = null
+    updates.intern_end_date   = null
+  }
   const { error } = await supabase
     .from('profiles')
-    .update({ full_name: fullName, role })
+    .update(updates)
     .eq('id', userId)
   if (error) return { error: error.message }
 
@@ -50,7 +69,7 @@ export async function updateUser(userId, { fullName, role, areaIds }) {
   return {}
 }
 
-export async function createUser({ email, password, fullName, role, areaIds, useInvite = false }) {
+export async function createUser({ email, password, fullName, role, areaIds, internStartDate, internEndDate, useInvite = false }) {
   const { data: { session } } = await supabase.auth.getSession()
   const response = await fetch(`${FUNCTIONS_URL}/create-user`, {
     method: 'POST',
@@ -67,7 +86,17 @@ export async function createUser({ email, password, fullName, role, areaIds, use
       use_invite: useInvite,
     }),
   })
-  return response.json()
+  const result = await response.json()
+
+  // Persist intern dates onto the new profile (edge function doesn't handle these)
+  if (!result.error && result.user?.id && role === 'intern' && (internStartDate || internEndDate)) {
+    await supabase.from('profiles').update({
+      intern_start_date: internStartDate || null,
+      intern_end_date:   internEndDate   || null,
+    }).eq('id', result.user.id)
+  }
+
+  return result
 }
 
 export async function fetchUserAreas(userId) {

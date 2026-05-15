@@ -17,6 +17,12 @@ import { saveTask } from './newTaskModal/saveTask'
 import { isCompleteDate } from './newTaskModal/utils'
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
+const PRIORITY_OPTIONS = [
+  { value: 'high',   label: 'High',   color: '#ef4444', bg: '#fef2f2' },
+  { value: 'medium', label: 'Medium', color: '#f59e0b', bg: '#fffbeb' },
+  { value: 'low',    label: 'Low',    color: '#10b981', bg: '#ecfdf5' },
+]
+
 export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
   const { profile } = useProfile()
   const [title, setTitle] = useState(editingTask?.title || '')
@@ -24,6 +30,19 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
   const [areaId, setAreaId] = useState(editingTask?.area_id || '')
   const [dueDate, setDueDate] = useState(editingTask?.due_date || '')
   const [startDate, setStartDate] = useState(editingTask?.start_date || '')
+  const [priority, setPriority] = useState(editingTask?.priority || 'medium')
+  // multi-area: array of selected area IDs
+  const [selectedAreaIds, setSelectedAreaIds] = useState(() => {
+    if (editingTask?.task_areas?.length) return editingTask.task_areas.map(ta => ta.area_id)
+    if (editingTask?.area_id) return [editingTask.area_id]
+    return []
+  })
+  // area slots: { [areaId]: count }
+  const [areaSlots, setAreaSlots] = useState(() => {
+    const slots = {}
+    ;(editingTask?.task_area_slots || []).forEach(s => { slots[s.area_id] = s.required_count })
+    return slots
+  })
   const [breakdowns, setBreakdowns] = useState(
     editingTask?.breakdowns
       ? [...editingTask.breakdowns]
@@ -93,16 +112,19 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
     ))
   }, [])
 
-  const selectedArea = areas.find(a => a.id === areaId)
-  const areaColor = selectedArea?.color || '#6366f1'
+  const areaColor = '#6366f1'
+  const toggleArea = (id) => setSelectedAreaIds(prev =>
+    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+  )
 
   const handleSubmit = async () => {
-    if (!title || !areaId) return
+    if (!title || selectedAreaIds.length === 0) return
     setLoading(true)
     await saveTask({
       editingTask,
-      fields: { title, description, areaId, dueDate, startDate },
+      fields: { title, description, selectedAreaIds, dueDate, startDate, priority },
       breakdowns,
+      areaSlots,
       profile,
     })
     onTaskCreated()
@@ -180,22 +202,32 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
           onBlur={e => e.target.style.borderColor = '#e5e7eb'}
         />
 
-        {/* Area */}
+        {/* Areas — multi-select pills */}
         <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#374151', marginBottom: '0.4rem' }}>
-          Business Area *
+          Business Areas * <span style={{ fontWeight: 400, color: '#9ca3af' }}>(select all that apply)</span>
         </label>
-        <select
-          value={areaId} onChange={e => setAreaId(e.target.value)}
-          style={{
-            width: '100%', padding: '0.6rem 0.75rem',
-            border: '1.5px solid #e5e7eb', borderRadius: '8px',
-            fontSize: '0.875rem', marginBottom: '1rem', boxSizing: 'border-box',
-            background: 'white',
-          }}
-        >
-          <option value="">Select an area</option>
-          {areas.map(area => <option key={area.id} value={area.id}>{area.name}</option>)}
-        </select>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '1rem' }}>
+          {areas.map(area => {
+            const active = selectedAreaIds.includes(area.id)
+            return (
+              <button
+                key={area.id}
+                type="button"
+                onClick={() => toggleArea(area.id)}
+                style={{
+                  padding: '0.3rem 0.75rem', borderRadius: '20px', cursor: 'pointer',
+                  border: `1.5px solid ${active ? area.color : '#e5e7eb'}`,
+                  background: active ? area.color + '18' : 'white',
+                  color: active ? area.color : '#6b7280',
+                  fontSize: '0.82rem', fontWeight: active ? 600 : 400,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {active ? '✓ ' : ''}{area.name}
+              </button>
+            )
+          })}
+        </div>
 
         {/* Dates — side by side */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
@@ -229,6 +261,58 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
               onBlur={e => e.target.style.borderColor = '#e5e7eb'}
             />
           </div>
+        </div>
+
+        {/* Priority */}
+        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#374151', marginBottom: '0.4rem' }}>
+          Priority
+        </label>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
+          {PRIORITY_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setPriority(opt.value)}
+              style={{
+                flex: 1, padding: '0.45rem 0',
+                border: `1.5px solid ${priority === opt.value ? opt.color : '#e5e7eb'}`,
+                borderRadius: '8px',
+                background: priority === opt.value ? opt.bg : 'white',
+                color: priority === opt.value ? opt.color : '#9ca3af',
+                fontSize: '0.82rem', fontWeight: 600,
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Intern slot requirements by area */}
+        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#374151', marginBottom: '0.25rem' }}>
+          Intern Slots Needed <span style={{ fontWeight: 400, color: '#9ca3af' }}>(by area)</span>
+        </label>
+        <p style={{ fontSize: '0.72rem', color: '#9ca3af', marginBottom: '0.6rem', marginTop: 0 }}>
+          Set how many interns from each area this task requires.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1.25rem' }}>
+          {areas.map(area => {
+            const count = areaSlots[area.id] || 0
+            return (
+              <div key={area.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.45rem 0.75rem', borderRadius: '8px', border: `1px solid ${count > 0 ? area.color + '50' : '#f3f4f6'}`, background: count > 0 ? area.color + '08' : '#fafafa' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 500, color: count > 0 ? area.color : '#6b7280' }}>
+                  {area.name}
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button type="button" onClick={() => setAreaSlots(s => ({ ...s, [area.id]: Math.max(0, (s[area.id] || 0) - 1) }))}
+                    style={{ width: '22px', height: '22px', borderRadius: '50%', border: '1px solid #e5e7eb', background: 'white', cursor: 'pointer', fontSize: '0.9rem', color: '#6b7280', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>−</button>
+                  <span style={{ minWidth: '18px', textAlign: 'center', fontSize: '0.88rem', fontWeight: 600, color: count > 0 ? area.color : '#9ca3af' }}>{count}</span>
+                  <button type="button" onClick={() => setAreaSlots(s => ({ ...s, [area.id]: (s[area.id] || 0) + 1 }))}
+                    style={{ width: '22px', height: '22px', borderRadius: '50%', border: '1px solid #e5e7eb', background: 'white', cursor: 'pointer', fontSize: '0.9rem', color: '#6b7280', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>+</button>
+                </div>
+              </div>
+            )
+          })}
         </div>
 
         <div style={{ height: '1px', background: '#f1f5f9', marginBottom: '1.25rem' }} />
@@ -310,14 +394,14 @@ export default function NewTaskModal({ onClose, onTaskCreated, editingTask }) {
         {/* Submit */}
         <button
           onClick={handleSubmit}
-          disabled={loading || !title || !areaId}
+          disabled={loading || !title || selectedAreaIds.length === 0}
           style={{
             width: '100%', padding: '0.75rem',
-            background: !title || !areaId ? '#e5e7eb' : areaColor,
-            color: !title || !areaId ? '#9ca3af' : 'white',
+            background: !title || selectedAreaIds.length === 0 ? '#e5e7eb' : areaColor,
+            color: !title || selectedAreaIds.length === 0 ? '#9ca3af' : 'white',
             border: 'none', borderRadius: '9px',
             fontSize: '0.95rem', fontWeight: 600,
-            cursor: loading || !title || !areaId ? 'not-allowed' : 'pointer',
+            cursor: loading || !title || selectedAreaIds.length === 0 ? 'not-allowed' : 'pointer',
             transition: 'background 0.2s',
           }}
         >

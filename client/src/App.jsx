@@ -9,7 +9,8 @@ const UserManagement = lazy(() => import('./pages/UserManagement'))
 const ActivityLog    = lazy(() => import('./pages/ActivityLog'))
 const Leaderboard    = lazy(() => import('./pages/Leaderboard'))
 const GanttChart     = lazy(() => import('./pages/GanttChart'))
-const UserAnalytics  = lazy(() => import('./pages/UserAnalytics'))
+const UserAnalytics   = lazy(() => import('./pages/UserAnalytics'))
+const InternTimeline  = lazy(() => import('./pages/InternTimeline'))
 
 function LoadingFallback() {
   return (
@@ -32,7 +33,8 @@ function App() {
         <Route path="/activity"    element={<ActivityLog />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/gantt"       element={<GanttChart />} />
-        <Route path="/analytics"   element={<UserAnalytics />} />
+        <Route path="/analytics"        element={<UserAnalytics />} />
+        <Route path="/intern-timeline"  element={<InternTimeline />} />
         <Route path="*"            element={<Navigate to="/login" />} />
       </Routes>
     </Suspense>

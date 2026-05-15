@@ -106,11 +106,38 @@ export default function TaskCard({
   const totalCount = breakdowns.length
   const percent = totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0
 
+  const priorityBorderColor = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' }[task.priority] || '#6366f1'
+  const taskAreas = task.task_areas?.length ? task.task_areas : (task.areas ? [{ area_id: task.area_id, areas: task.areas }] : [])
+
+  // Build a multi-color left strip using background gradient (4px wide)
+  // Falls back to priority color when no area colors are available
+  const areaColors = taskAreas.map(ta => ta.areas?.color).filter(Boolean)
+  let leftStripBackground
+  if (areaColors.length === 0) {
+    leftStripBackground = `linear-gradient(to right, ${priorityBorderColor} 4px, white 4px)`
+  } else if (areaColors.length === 1) {
+    leftStripBackground = `linear-gradient(to right, ${areaColors[0]} 4px, white 4px)`
+  } else {
+    const n = areaColors.length
+    const stops = areaColors.map((c, i) => {
+      const pct0 = ((i / n) * 100).toFixed(1)
+      const pct1 = (((i + 1) / n) * 100).toFixed(1)
+      return `${c} ${pct0}% ${pct1}%`
+    }).join(', ')
+    leftStripBackground = `linear-gradient(to right, transparent 4px, white 4px), linear-gradient(to bottom, ${stops}) 0 0 / 4px 100% no-repeat, white`
+    // Simpler: use a single background shorthand
+    leftStripBackground = `linear-gradient(to bottom, ${stops}) 0 0 / 4px 100% no-repeat, white`
+  }
+
   return (
     <div style={{
-      background: 'white', borderRadius: '14px',
-      padding: '1.25rem 1.5rem', border: '1px solid #f1f5f9',
-      borderLeft: `4px solid ${task.areas?.color || '#6366f1'}`,
+      background: leftStripBackground,
+      borderRadius: '14px',
+      padding: '1.25rem 1.5rem',
+      borderTop: '1px solid #f1f5f9',
+      borderRight: '1px solid #f1f5f9',
+      borderBottom: '1px solid #f1f5f9',
+      borderLeft: 'none',
       position: 'relative',
       boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)',
       transition: 'box-shadow 0.2s, transform 0.2s',
@@ -128,14 +155,31 @@ export default function TaskCard({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
         <div>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.25rem' }}>{task.title}</h3>
-          <span style={{
-            fontSize: '0.75rem', padding: '0.2rem 0.6rem',
-            background: (task.areas?.color || '#6366f1') + '20',
-            color: task.areas?.color || '#6366f1',
-            borderRadius: '20px', fontWeight: 500,
-          }}>
-            {task.areas?.name}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+            {taskAreas.map(ta => {
+              const area = ta.areas
+              if (!area) return null
+              return (
+                <span key={ta.area_id} style={{
+                  fontSize: '0.75rem', padding: '0.2rem 0.6rem',
+                  background: (area.color || '#6366f1') + '20',
+                  color: area.color || '#6366f1',
+                  borderRadius: '20px', fontWeight: 500,
+                }}>
+                  {area.name}
+                </span>
+              )
+            })}
+            {task.priority && (() => {
+              const cfg = { high: { color: '#ef4444', bg: '#fef2f2', label: '↑ High' }, medium: { color: '#f59e0b', bg: '#fffbeb', label: '→ Medium' }, low: { color: '#10b981', bg: '#ecfdf5', label: '↓ Low' } }
+              const p = cfg[task.priority] || cfg.medium
+              return (
+                <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', background: p.bg, color: p.color, borderRadius: '20px', fontWeight: 600 }}>
+                  {p.label}
+                </span>
+              )
+            })()}
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
