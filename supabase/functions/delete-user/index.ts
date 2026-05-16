@@ -20,6 +20,9 @@ Deno.serve(async (req) => {
     const url = new URL(req.url)
     const id = url.pathname.split('/').pop()
 
+    // Remove all rows that reference this user before touching profiles
+    await supabase.from('task_assignments').delete().eq('user_id', id)
+    await supabase.from('activity_log').delete().eq('user_id', id)
     await supabase.from('user_areas').delete().eq('user_id', id)
     await supabase.from('profiles').delete().eq('id', id)
 

@@ -2,15 +2,6 @@ import { supabase } from '../../supabase'
 import { logActivity } from '../../utils/logActivity'
 import { fmtShort, fmtFull } from './utils'
 
-// ─── Fire-and-forget Notion sync (won't block the UI) ────────────────────────
-async function syncToNotion(taskId) {
-  try {
-    await supabase.functions.invoke('sync-to-notion', { body: { task_id: taskId } })
-  } catch (err) {
-    console.warn('[Notion auto-sync]', err)
-  }
-}
-
 // Save task_area_slots — delete all existing then re-insert
 async function saveAreaSlots(taskId, areaSlots) {
   await supabase.from('task_area_slots').delete().eq('task_id', taskId)
@@ -48,9 +39,6 @@ export async function saveTask({ editingTask, fields, breakdowns, areaSlots = {}
 
     await saveTaskAreas(editingTask.id, selectedAreaIds)
     await saveAreaSlots(editingTask.id, areaSlots)
-
-    // Sync updated task to Notion in the background
-    syncToNotion(editingTask.id)
 
     // Log task-level date changes
     const oldStart = editingTask.start_date || ''
@@ -139,7 +127,5 @@ export async function saveTask({ editingTask, fields, breakdowns, areaSlots = {}
       })
     }
 
-    // Sync new task to Notion in the background (small delay so breakdowns are committed)
-    setTimeout(() => syncToNotion(task.id), 500)
   }
 }

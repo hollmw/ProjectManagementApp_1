@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>DRESIO Workspace — User Guide</title>
+<style>
+  :root{
+    --indigo:#4F46E5;--indigo-l:#EEF2FF;
+    --green:#059669;--green-l:#D1FAE5;
+    --amber:#D97706;--amber-l:#FFFBEB;
+    --red:#DC2626;--red-l:#FEF2F2;
+    --slate:#1E293B;--gray:#64748B;--lgray:#F8FAFC;
+    --border:#E2E8F0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;font-size:14px;color:var(--slate);background:#fff;line-height:1.6}
+
+  /* ── Print / page breaks ── */
+  @media print{
+    .page-break{page-break-before:always}
+    nav{display:none}
+    main{margin-left:0!important;padding:24px 40px!important;max-width:100%!important}
+    body{font-size:11px}
+    h1{font-size:20px}
+    h2{font-size:15px}
+    h3{font-size:13px}
+    .cover{padding:60px 20px 40px}
+    .cover .brand{font-size:52px}
+    .cover .title{font-size:24px}
+  }
+
+  /* ── Navigation sidebar ── */
+  nav{
+    position:fixed;top:0;left:0;width:220px;height:100vh;
+    background:var(--lgray);border-right:1px solid var(--border);
+    overflow-y:auto;padding:20px 0;z-index:100;
+  }
+  nav .logo{padding:0 16px 16px;border-bottom:1px solid var(--border);margin-bottom:12px}
+  nav .logo .name{font-size:18px;font-weight:800;color:var(--indigo)}
+  nav .logo .sub{font-size:11px;color:var(--gray)}
+  nav a{display:block;padding:5px 16px;color:var(--slate);text-decoration:none;font-size:12px;border-left:3px solid transparent}
+  nav a:hover{background:var(--indigo-l);border-left-color:var(--indigo);color:var(--indigo)}
+  nav .section-label{padding:12px 16px 4px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--gray);letter-spacing:.08em}
+
+  /* ── Main content ── */
+  main{margin-left:220px;padding:48px 60px;max-width:960px}
+
+  /* ── Cover ── */
+  .cover{text-align:center;padding:100px 40px 80px;border-bottom:2px solid var(--border);margin-bottom:60px}
+  .cover .brand{font-size:72px;font-weight:900;color:var(--indigo);letter-spacing:-2px}
+  .cover .brand-sub{font-size:28px;color:var(--gray);margin-bottom:24px}
+  .cover .title{display:inline-block;border-top:3px solid var(--indigo);border-bottom:3px solid var(--indigo);padding:12px 32px;font-size:32px;font-weight:700;color:var(--slate);margin-bottom:16px}
+  .cover .subtitle{font-size:18px;font-style:italic;color:var(--gray);margin-bottom:48px}
+  .cover .creds{display:inline-block;background:var(--indigo-l);border:1px solid var(--indigo);border-radius:8px;padding:12px 28px;font-size:15px;color:var(--indigo);font-weight:600}
+
+  /* ── Headings ── */
+  h1{font-size:26px;color:var(--indigo);border-bottom:3px solid var(--indigo);padding-bottom:8px;margin:48px 0 20px;font-weight:800}
+  h1:first-of-type{margin-top:0}
+  h2{font-size:18px;color:var(--slate);font-weight:700;margin:32px 0 12px}
+  h3{font-size:15px;color:var(--gray);font-weight:700;margin:24px 0 8px}
+
+  /* ── Body text ── */
+  p{margin-bottom:12px;color:var(--slate)}
+
+  /* ── Callout boxes ── */
+  .callout{display:flex;border-radius:6px;overflow:hidden;margin:16px 0;border:1px solid var(--border)}
+  .callout .label{min-width:72px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:8px 10px;color:#fff}
+  .callout .body{padding:12px 16px;font-size:13px;color:var(--slate);line-height:1.55}
+  .callout.tip .label{background:var(--indigo)}
+  .callout.tip{border-color:var(--indigo);background:var(--indigo-l)}
+  .callout.note .label{background:var(--amber)}
+  .callout.note{border-color:var(--amber);background:var(--amber-l)}
+  .callout.important .label{background:var(--red)}
+  .callout.important{border-color:var(--red);background:var(--red-l)}
+
+  /* ── Info box ── */
+  .info-box{background:var(--lgray);border:1px solid var(--border);border-radius:6px;padding:16px 20px;margin:16px 0;font-size:13px;color:var(--slate);line-height:1.8;font-family:monospace}
+  .info-box .box-title{font-family:Arial,sans-serif;font-weight:700;font-size:13px;margin-bottom:8px;color:var(--slate)}
+
+  /* ── KV table ── */
+  table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:13px}
+  thead tr th{background:var(--indigo);color:#fff;padding:8px 12px;text-align:left;font-weight:700}
+  tbody tr:nth-child(even) td{background:var(--lgray)}
+  tbody tr:nth-child(odd) td{background:#fff}
+  td{padding:8px 12px;border:1px solid var(--border);color:var(--slate);vertical-align:top}
+  td.key{font-weight:700;white-space:nowrap;width:220px}
+  td.center{text-align:center}
+  td.green{color:var(--green);font-weight:700}
+  td.red{color:var(--red);font-weight:700}
+
+  /* ── Bullet list ── */
+  ul.guide{list-style:none;padding:0;margin:8px 0 16px}
+  ul.guide li{padding:4px 0 4px 20px;position:relative;font-size:13px;color:var(--slate)}
+  ul.guide li::before{content:"•";position:absolute;left:4px;color:var(--indigo);font-weight:900}
+  ul.guide ul{margin:4px 0 0 16px}
+  ul.guide ul li::before{content:"◦";color:var(--gray)}
+
+  /* ── Page break helper ── */
+  .page-break{margin:56px 0 0;border:none;border-top:1px dashed var(--border)}
+
+  /* ── Footer ── */
+  footer{margin-top:80px;padding:24px 0;border-top:2px solid var(--indigo);text-align:center;font-size:12px;color:var(--gray)}
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar nav ── -->
+<nav>
+  <div class="logo">
+    <div class="name">DRESIO</div>
+    <div class="sub">User Guide</div>
+  </div>
+  <div class="section-label">Contents</div>
+  <a href="#overview">1. Overview</a>
+  <a href="#login">2. Logging In</a>
+  <a href="#navigation">3. Navigation</a>
+  <a href="#taskboard">4. Task Board</a>
+  <a href="#assigning">5. Assigning Interns</a>
+  <a href="#breakdown">6. Breakdown Steps</a>
+  <a href="#gantt">7. Gantt Chart</a>
+  <a href="#leaderboard">8. Leaderboard</a>
+  <a href="#usermgmt">9. User Management</a>
+  <a href="#timeline">10. Intern Timeline</a>
+  <a href="#activitylog">11. Activity Log</a>
+  <a href="#analytics">12. User Analytics</a>
+  <a href="#roles">13. Roles & Permissions</a>
+  <a href="#quickref">14. Quick Reference</a>
+</nav>
+
+<!-- ── Main ── -->
+<main>
+
+  <!-- Cover -->
+  <div class="cover">
+    <div class="brand">DRESIO</div>
+    <div class="brand-sub">Workspace</div>
+    <div class="title">Complete User Guide</div>
+    <div class="subtitle">Intern &amp; Project Management Platform</div>
+    <div class="creds">Admin login:&nbsp;&nbsp;admin@admin.com&nbsp;&nbsp;/&nbsp;&nbsp;admin</div>
+  </div>
+
+  <!-- ══ 1. OVERVIEW ══ -->
+  <h1 id="overview">1.&nbsp; Overview</h1>
+  <p>DRESIO Workspace is a project and intern management platform built for organisations running structured internship programmes. It lets admins create projects, assign interns based on their business area and availability, track progress in real time, and analyse how well intern capacity is being used across the organisation.</p>
+  <p>The platform has two access levels:</p>
+  <ul class="guide">
+    <li><strong>Admins &amp; Members</strong> — full access to all pages including user management, analytics, and the intern timeline.</li>
+    <li><strong>Interns</strong> — read-only access to the task board, Gantt chart, and leaderboard. They cannot create tasks or manage users.</li>
+  </ul>
+  <div class="callout tip"><div class="label">TIP</div><div class="body">All pages are accessible from the sidebar on the left. Admins see an extra <strong>Admin</strong> section containing advanced tools.</div></div>
+
+  <hr class="page-break"/>
+
+  <!-- ══ 2. LOGGING IN ══ -->
+  <h1 id="login">2.&nbsp; Logging In</h1>
+  <p>Navigate to the DRESIO Workspace URL in your browser. You will be presented with a login screen.</p>
+  <div class="info-box">
+    <div class="box-title">Admin credentials</div>
+    Email:&nbsp;&nbsp;&nbsp;&nbsp; admin@admin.com<br/>
+    Password:&nbsp; admin
+  </div>
+  <p>Enter the email and password, then click <strong>Sign In</strong>. Non-admin users will have been given their credentials separately. After a successful login you are taken directly to the Task Board.</p>
+  <div class="callout note"><div class="label">NOTE</div><div class="body">If you navigate directly to any page URL (e.g. <code>/dashboard</code>) and see a 404, try refreshing. Direct URL access is fully supported once the app is deployed correctly.</div></div>
+
+  <hr class="page-break"/>
+
+  <!-- ══ 3. NAVIGATION ══ -->
+  <h1 id="navigation">3.&nbsp; Navigation</h1>
+  <p>The sidebar is always visible on the left. It is divided into two sections.</p>
+
+  <h2>3.1&nbsp; Main Navigation</h2>
+  <table>
+    <thead><tr><th>Page</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td class="key">Task Board</td><td>The main kanban board. Create, view, and manage all projects.</td></tr>
+      <tr><td class="key">Leaderboard</td><td>Points-based ranking of all users based on completed task steps.</td></tr>
+      <tr><td class="key">Gantt Chart</td><td>Timeline view of all tasks. Filter by user to see individual workloads.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>3.2&nbsp; Admin Navigation</h2>
+  <p>Only visible to admins and members. Click the <strong>Admin</strong> chevron in the sidebar to expand it.</p>
+  <table>
+    <thead><tr><th>Page</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td class="key">User Management</td><td>Create, edit, and delete users. Set intern placement dates and business areas.</td></tr>
+      <tr><td class="key">Intern Timeline</td><td>Resource Gantt showing all interns' assigned tasks across time. Click any row to open that intern's Gantt chart.</td></tr>
+      <tr><td class="key">Activity Log</td><td>Chronological feed of all actions taken in the platform (steps checked, tasks edited, etc.).</td></tr>
+      <tr><td class="key">User Analytics</td><td>Dashboard with completion rates, slot fill rates, intern utilisation, and capacity vs demand charts.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>3.3&nbsp; Signing Out</h2>
+  <p>Click the <strong>Sign out</strong> button at the very bottom of the sidebar beneath your name and role badge.</p>
+
+  <hr class="page-break"/>
+
+  <!-- ══ 4. TASK BOARD ══ -->
+  <h1 id="taskboard">4.&nbsp; Task Board</h1>
+  <p>The Task Board is the central hub of the platform. It shows all projects as cards organised into three columns.</p>
+  <table>
+    <thead><tr><th>Column</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td class="key">To Do</td><td>Tasks that have not yet been started.</td></tr>
+      <tr><td class="key">In Progress</td><td>Tasks actively being worked on.</td></tr>
+      <tr><td class="key">Done</td><td>Completed tasks.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4.1&nbsp; Filtering Tasks</h2>
+  <p>Above the board there is a row of filter controls:</p>
+  <ul class="guide">
+    <li><strong>Search</strong> — type any part of a task title to instantly filter the board.</li>
+    <li><strong>Business Area</strong> — filter tasks by a specific area (Tech, Business, Marketing, Science, Clinical, Design).</li>
+    <li><strong>Priority</strong> — filter by High, Medium, or Low priority.</li>
+    <li><strong>Assigned to me</strong> — show only tasks you are personally assigned to.</li>
+  </ul>
+
+  <h2>4.2&nbsp; Reading a Task Card</h2>
+  <p>Each card on the board shows the following at a glance:</p>
+  <table>
+    <thead><tr><th>Element</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="key">Left colour strip</td><td>A vertical stripe on the left edge. Each colour segment represents a business area the task belongs to. Multiple areas = multiple colours stacked vertically.</td></tr>
+      <tr><td class="key">Title</td><td>The name of the project.</td></tr>
+      <tr><td class="key">Area chips</td><td>Coloured pills showing which business areas the task belongs to (e.g. Tech, Clinical).</td></tr>
+      <tr><td class="key">Priority badge</td><td>↑ High (red), → Medium (amber), or ↓ Low (green).</td></tr>
+      <tr><td class="key">Slot fill pills</td><td>Small pills showing how many intern slots are filled per area. "Tech 1/3" means 1 of 3 Tech slots filled. Green ✓ = exactly met. Indigo ↑ = over-filled.</td></tr>
+      <tr><td class="key">Due date</td><td>The deadline for the task.</td></tr>
+      <tr><td class="key">Status badge</td><td>Shows the current status: todo, in_progress, done, or complete if all steps are checked.</td></tr>
+      <tr><td class="key">Assigned avatars</td><td>Circular initials of everyone assigned. Up to 4 shown, then a +N overflow badge.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4.3&nbsp; Creating a Task</h2>
+  <p>Click the <strong>+ New Task</strong> button (top right of the board). A modal will open with the following fields:</p>
+  <table>
+    <thead><tr><th>Field</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="key">Title</td><td>Required. The project name.</td></tr>
+      <tr><td class="key">Description</td><td>Optional. A short summary of what the project involves.</td></tr>
+      <tr><td class="key">Business Areas</td><td>Required. Select one or more areas from the coloured pills. The first area selected becomes the primary area.</td></tr>
+      <tr><td class="key">Priority</td><td>Choose High, Medium, or Low. Defaults to Medium.</td></tr>
+      <tr><td class="key">Start Date</td><td>When the project begins. Used for intern availability checking.</td></tr>
+      <tr><td class="key">Due Date</td><td>The project deadline.</td></tr>
+      <tr><td class="key">Slot Requirements</td><td>For each business area selected, set how many interns from that area are needed using the + and − buttons.</td></tr>
+      <tr><td class="key">Breakdown Steps</td><td>Add individual checklist items. Each step can be checked off by interns and earns 10 points on the leaderboard.</td></tr>
+    </tbody>
+  </table>
+  <p>Click <strong>Save</strong> to create the task. It will appear in the To Do column.</p>
+
+  <h2>4.4&nbsp; Editing or Deleting a Task</h2>
+  <p>Click the <strong>⋯ menu</strong> (three dots) in the top-right corner of any task card:</p>
+  <ul class="guide">
+    <li><strong>Edit task</strong> — reopens the creation modal with all fields pre-filled.</li>
+    <li><strong>Delete task</strong> — removes the task permanently after a confirmation prompt. Admin/member only.</li>
+  </ul>
+
+  <hr class="page-break"/>
+
+  <!-- ══ 5. ASSIGNING INTERNS ══ -->
+  <h1 id="assigning">5.&nbsp; Assigning Interns to Tasks</h1>
+  <p>The assignment panel lives at the bottom of each task card. It shows who is currently assigned and lets you add or remove people.</p>
+
+  <h2>5.1&nbsp; Opening the Assign Panel</h2>
+  <p>Click the <strong>+ Assign</strong> button on the right side of the Assigned row. The panel expands to show a list of all users.</p>
+
+  <h2>5.2&nbsp; Reading the User List</h2>
+  <p>Each row in the panel shows one user with the following information:</p>
+  <ul class="guide">
+    <li><strong>Avatar initial</strong> — coloured by their matching business area if they qualify for a slot requirement; grey otherwise.</li>
+    <li><strong>Name</strong> — faded and at 45% opacity if they do not match any slot requirement on this task.</li>
+    <li><strong>Area chips</strong> — all business areas the intern belongs to. Coloured if the area matches a slot requirement; grey otherwise.</li>
+    <li><strong>Busyness badge</strong> — shows concurrent projects during this task's date range. Green = free/1 project, Amber = 2 projects, Red = 3 or more.</li>
+    <li><strong>⚠ Starts late</strong> — appears if the intern's placement start date is after the task's start date.</li>
+    <li><strong>⚠ Ends early</strong> — appears if the intern's placement end date is before the task's due date.</li>
+    <li><strong>Assign / Assigned ✓ button</strong> — click to toggle assignment on or off.</li>
+  </ul>
+
+  <h2>5.3&nbsp; Filtering Users by Area</h2>
+  <p>A row of area filter tabs appears above the user list. Click any area to show only users who belong to it. Areas with a slot requirement on this task are highlighted with a coloured dot (●). Click <strong>All</strong> to clear the filter.</p>
+
+  <h2>5.4&nbsp; Slot Status Indicators</h2>
+  <p>At the top of the assignment panel, coloured pills show the fill status for each slot requirement:</p>
+  <ul class="guide">
+    <li><strong>Area colour (dim)</strong> — slots not yet filled. E.g. "Tech 1/3".</li>
+    <li><strong>Green ✓</strong> — all slots for that area are filled. E.g. "Tech 3/3 ✓".</li>
+    <li><strong>Indigo ↑</strong> — more people assigned than required. E.g. "Tech 4/3 ↑".</li>
+  </ul>
+
+  <h2>5.5&nbsp; Auto-Fill</h2>
+  <p>If a task has slot requirements set, an <strong>⚡ Auto-fill</strong> button appears next to the + Assign button. Clicking it automatically assigns the best available interns based on the following rules:</p>
+  <table>
+    <thead><tr><th>Rule</th><th>How it works</th></tr></thead>
+    <tbody>
+      <tr><td class="key">Slot priority</td><td>Slots with the lowest fill rate are filled first — most understaffed slots get interns first.</td></tr>
+      <tr><td class="key">Specialist first</td><td>Interns who belong to only one matching area are preferred over multi-discipline interns, preserving versatile interns as backups for other slots.</td></tr>
+      <tr><td class="key">Least busy first</td><td>Among equally qualified interns, those with the fewest concurrent projects during the task period are selected first.</td></tr>
+      <tr><td class="key">Placement overlap</td><td>Only interns whose placement period fully covers the task's date range are eligible. Interns who start after the project starts or finish before it ends are automatically skipped.</td></tr>
+    </tbody>
+  </table>
+  <p>After auto-fill completes, a feedback toast appears showing how many interns were assigned and how many were skipped (with the reason, e.g. "2 skipped — start after project").</p>
+  <div class="callout tip"><div class="label">TIP</div><div class="body">Set both a <strong>Start Date</strong> and <strong>Due Date</strong> on the task, and make sure intern placement dates are configured in User Management, before using Auto-fill. Without dates the availability check cannot run.</div></div>
+
+  <hr class="page-break"/>
+
+  <!-- ══ 6. BREAKDOWN STEPS ══ -->
+  <h1 id="breakdown">6.&nbsp; Task Breakdown Steps</h1>
+  <p>Breakdown steps are individual checklist items within a task. They allow work to be tracked at a granular level and tie directly into the leaderboard points system.</p>
+  <ul class="guide">
+    <li>Steps are listed below the task description inside the task card.</li>
+    <li>Any user assigned to the task can check off a step by clicking the checkbox.</li>
+    <li>Checking a step for the first time awards <strong>10 points</strong> to the user who checked it.</li>
+    <li>Unchecking a step removes it from the activity log but does not deduct points.</li>
+    <li>When all steps are checked the task status badge changes to <strong>complete</strong>.</li>
+  </ul>
+  <div class="callout note"><div class="label">NOTE</div><div class="body">Steps can only be added or edited when creating or editing a task via the ⋯ menu. They cannot be reordered after creation.</div></div>
+
+  <!-- ══ 7. GANTT CHART ══ -->
+  <h1 id="gantt">7.&nbsp; Gantt Chart</h1>
+  <p>The Gantt Chart provides a timeline view of all tasks. Tasks are shown as horizontal bars stretching from their start date to their due date.</p>
+
+  <h2>8.1&nbsp; Reading the Chart</h2>
+  <ul class="guide">
+    <li>Each row is one task.</li>
+    <li>Bars are coloured by the task's primary business area colour.</li>
+    <li>The vertical line marks today's date.</li>
+    <li>Hover over a bar to see the task title and dates in a tooltip.</li>
+  </ul>
+
+  <h2>8.2&nbsp; Filtering by User</h2>
+  <p>Use the <strong>User dropdown</strong> at the top of the page to filter the chart to tasks assigned to a specific person. This is especially useful for reviewing an individual intern's workload. The Intern Timeline page links directly to this view — clicking a user row there opens the Gantt pre-filtered to that person.</p>
+
+  <!-- ══ 8. LEADERBOARD ══ -->
+  <h1 id="leaderboard">8.&nbsp; Leaderboard</h1>
+  <p>The Leaderboard ranks all users by the number of points they have earned. Points are awarded when a user checks off a breakdown step for the first time.</p>
+  <table>
+    <thead><tr><th>Points</th><th>When awarded</th></tr></thead>
+    <tbody>
+      <tr><td class="key">10 points</td><td>Awarded per unique breakdown step checked for the first time.</td></tr>
+      <tr><td class="key">0 points</td><td>Unchecking a step, or re-checking a step already checked before, earns no points.</td></tr>
+    </tbody>
+  </table>
+  <p>The leaderboard updates in real time as steps are checked. It is visible to all users including interns.</p>
+
+  <hr class="page-break"/>
+
+  <!-- ══ 9. USER MANAGEMENT ══ -->
+  <h1 id="usermgmt">9.&nbsp; User Management</h1>
+  <p>Found under <strong>Admin → User Management</strong>. This page lets admins create, edit, and remove users, set their roles, assign them to business areas, and configure intern placement dates.</p>
+
+  <h2>10.1&nbsp; The User Table</h2>
+  <p>All users are listed in a table. The table can be filtered using the controls above it:</p>
+  <ul class="guide">
+    <li><strong>Search</strong> — filter by name.</li>
+    <li><strong>Business Area dropdown</strong> — show only users who belong to a specific area.</li>
+    <li><strong>Show unassigned only</strong> — tick this checkbox to highlight interns who have not been assigned to any task yet. A red <em>Unassigned</em> badge appears next to any intern with zero task assignments.</li>
+  </ul>
+
+  <h2>10.2&nbsp; Creating a User</h2>
+  <p>Click <strong>+ Add User</strong>. Fill in the following fields:</p>
+  <table>
+    <thead><tr><th>Field</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="key">Full Name</td><td>The user's display name (appears in avatars and assignments).</td></tr>
+      <tr><td class="key">Email</td><td>Used to log in. Must be unique.</td></tr>
+      <tr><td class="key">Password</td><td>Initial password. The user can change this after first login.</td></tr>
+      <tr><td class="key">Role</td><td>Admin (full access), Member (full access except user deletion), or Intern (read-only task board access).</td></tr>
+      <tr><td class="key">Business Areas</td><td>Select one or more areas. These determine which slot requirements the user is eligible for.</td></tr>
+      <tr><td class="key">Placement Start Date</td><td>Intern only. The date the intern's programme begins.</td></tr>
+      <tr><td class="key">Placement End Date</td><td>Intern only. The date the intern's programme ends.</td></tr>
+    </tbody>
+  </table>
+  <div class="callout important"><div class="label">IMPORTANT</div><div class="body">Placement dates are critical for the Auto-fill feature. Without them, interns cannot be matched to tasks by date range and will not appear as eligible candidates during auto-assignment.</div></div>
+
+  <h2>10.3&nbsp; Editing a User</h2>
+  <p>Click the <strong>Edit</strong> button on any user row. All fields can be updated including placement dates and business areas. Changes take effect immediately.</p>
+
+  <h2>10.4&nbsp; Deleting a User</h2>
+  <p>Click the <strong>Delete</strong> button on a user row. You will be asked to confirm. Deleting a user removes them from all task assignments — this action cannot be undone.</p>
+
+  <hr class="page-break"/>
+
+  <!-- ══ 10. INTERN TIMELINE ══ -->
+  <h1 id="timeline">10.&nbsp; Intern Timeline</h1>
+  <p>Found under <strong>Admin → Intern Timeline</strong>. This is a resource Gantt chart showing every intern on the vertical axis and dates on the horizontal axis.</p>
+
+  <h2>11.1&nbsp; Reading the Timeline</h2>
+  <ul class="guide">
+    <li>Each row represents one user.</li>
+    <li>The dashed shaded band shows the intern's placement period (start to end date).</li>
+    <li>Solid coloured bars represent assigned tasks during that period.</li>
+    <li>A vertical line marks today.</li>
+    <li>Weekend columns are lightly shaded.</li>
+  </ul>
+
+  <h2>11.2&nbsp; Bar Colour Coding</h2>
+  <p>Task bars are coloured based on how many projects the intern is running concurrently at that time:</p>
+  <table>
+    <thead><tr><th>Colour</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td class="key" style="color:var(--green);font-weight:700">Green</td><td>1 project running — comfortable workload.</td></tr>
+      <tr><td class="key" style="color:var(--amber);font-weight:700">Amber</td><td>2 projects running concurrently — manageable but worth monitoring.</td></tr>
+      <tr><td class="key" style="color:var(--red);font-weight:700">Red</td><td>3 or more projects overlapping — intern is overloaded.</td></tr>
+    </tbody>
+  </table>
+  <p>Bars outlined in amber with a ⚠ icon indicate tasks that extend beyond the intern's placement end date.</p>
+
+  <h2>11.3&nbsp; Interacting with the Timeline</h2>
+  <ul class="guide">
+    <li>Click any user row to open the Gantt Chart pre-filtered to that person.</li>
+    <li>Use the <strong>Show all users / Interns only</strong> toggle in the top-right to switch between views.</li>
+    <li>The timeline automatically scrolls to today on page load.</li>
+    <li>Hover over a task bar to see the title and any warnings in a tooltip.</li>
+  </ul>
+
+  <h2>11.4&nbsp; Left Panel</h2>
+  <p>The fixed left panel shows each user's name, their business area chips, and a red <em>Unassigned</em> badge if they have no tasks. Click anywhere on the row to navigate to their Gantt.</p>
+
+  <!-- ══ 11. ACTIVITY LOG ══ -->
+  <h1 id="activitylog">11.&nbsp; Activity Log</h1>
+  <p>Found under <strong>Admin → Activity Log</strong>. This page shows a chronological feed of all actions taken in the platform, most recent first.</p>
+  <p>Each entry shows the user who performed the action, a description of what was done, the task it relates to, any points awarded, and the timestamp. This is useful for auditing intern participation and tracking who completed which steps.</p>
+
+  <hr class="page-break"/>
+
+  <!-- ══ 12. USER ANALYTICS ══ -->
+  <h1 id="analytics">12.&nbsp; User Analytics</h1>
+  <p>Found under <strong>Admin → User Analytics</strong>. This dashboard provides a high-level view of how the organisation is performing across all projects and interns.</p>
+
+  <h2>13.1&nbsp; Summary Stat Cards</h2>
+  <table>
+    <thead><tr><th>Card</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td class="key">Total Users</td><td>Total number of accounts in the system.</td></tr>
+      <tr><td class="key">Completion Rate</td><td>Percentage of filtered tasks that are fully completed.</td></tr>
+      <tr><td class="key">Overdue Tasks</td><td>Number of tasks past their due date that are not yet done.</td></tr>
+      <tr><td class="key">Slot Fill Rate</td><td>Overall percentage of intern slots filled across all tasks with slot requirements.</td></tr>
+      <tr><td class="key">Unassigned Interns</td><td>Number of interns with zero task assignments. Zero is shown in green.</td></tr>
+      <tr><td class="key">Active Today</td><td>Number of users who have logged any activity today.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>13.2&nbsp; Filters</h2>
+  <ul class="guide">
+    <li><strong>Group by</strong> — switch between grouping metrics by User or by Business Area.</li>
+    <li><strong>Business Area</strong> — filter all data to a single area.</li>
+    <li><strong>User</strong> — filter all data to a single person.</li>
+    <li><strong>Due from / Due to</strong> — filter tasks by due date range.</li>
+    <li><strong>Clear filters</strong> — resets all filters at once.</li>
+  </ul>
+
+  <h2>13.3&nbsp; Completion Chart</h2>
+  <p>A horizontal bar chart showing completion rates. Each bar represents one user or area (depending on Group by). Bars show the proportion of done tasks (indigo) and overdue tasks (amber). The completion percentage is shown to the right.</p>
+
+  <h2>13.4&nbsp; Activity Trend</h2>
+  <p>A line chart showing total activity events per day over the last 7, 14, 30, or 60 days. Use the dropdown in the chart header to change the time window. Filter by user to see an individual's activity curve.</p>
+
+  <h2>13.5&nbsp; Detailed Metrics Table</h2>
+  <p>A sortable table with one row per user or area. Click any column header to sort. Columns include: Tasks, Done, Overdue, Rate (with mini progress bar), Steps, Steps Done, and Steps Late.</p>
+
+  <h2>13.6&nbsp; Slot Coverage by Area</h2>
+  <p>For each business area with slot requirements, this section shows how many slots have been filled vs. how many are required in total across all tasks. The progress bar turns green when 100% filled.</p>
+
+  <h2>13.7&nbsp; Intern Capacity vs Demand</h2>
+  <p>A dual-bar chart comparing the number of interns available in each area against the total number of intern slots demanded by all tasks. A ⚠️ warning icon appears when demand exceeds capacity.</p>
+
+  <h2>13.8&nbsp; Intern Utilisation</h2>
+  <p>A bar per intern showing what percentage of their placement period is covered by at least one assigned task. Colour coded: Green ≥ 80% (well utilised), Amber 50–79% (moderate), Indigo &lt;50% (under-utilised), Hatched = no placement dates set.</p>
+
+  <hr class="page-break"/>
+
+  <!-- ══ 13. ROLES & PERMISSIONS ══ -->
+  <h1 id="roles">13.&nbsp; Roles &amp; Permissions Summary</h1>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:46%">Feature</th>
+        <th class="center">Admin</th>
+        <th class="center">Member</th>
+        <th class="center">Intern</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>View Task Board</td><td class="center green">✓</td><td class="center green">✓</td><td class="center green">✓</td></tr>
+      <tr><td>Check off breakdown steps</td><td class="center green">✓</td><td class="center green">✓</td><td class="center green">✓</td></tr>
+      <tr><td>View Gantt Chart</td><td class="center green">✓</td><td class="center green">✓</td><td class="center green">✓</td></tr>
+      <tr><td>View Leaderboard</td><td class="center green">✓</td><td class="center green">✓</td><td class="center green">✓</td></tr>
+      <tr><td>Create / edit tasks</td><td class="center green">✓</td><td class="center green">✓</td><td class="center red">✗</td></tr>
+      <tr><td>Delete tasks</td><td class="center green">✓</td><td class="center green">✓</td><td class="center red">✗</td></tr>
+      <tr><td>Assign / unassign interns</td><td class="center green">✓</td><td class="center green">✓</td><td class="center red">✗</td></tr>
+      <tr><td>Auto-fill intern slots</td><td class="center green">✓</td><td class="center green">✓</td><td class="center red">✗</td></tr>
+      <tr><td>User Management</td><td class="center green">✓</td><td class="center green">✓</td><td class="center red">✗</td></tr>
+      <tr><td>Intern Timeline</td><td class="center green">✓</td><td class="center green">✓</td><td class="center red">✗</td></tr>
+      <tr><td>Activity Log</td><td class="center green">✓</td><td class="center green">✓</td><td class="center red">✗</td></tr>
+      <tr><td>User Analytics</td><td class="center green">✓</td><td class="center green">✓</td><td class="center red">✗</td></tr>
+      <tr><td>Delete users</td><td class="center green">✓</td><td class="center red">✗</td><td class="center red">✗</td></tr>
+    </tbody>
+  </table>
+
+  <hr class="page-break"/>
+
+  <!-- ══ 14. QUICK REFERENCE ══ -->
+  <h1 id="quickref">14.&nbsp; Quick Reference</h1>
+
+  <h2>Business Areas</h2>
+  <ul class="guide">
+    <li><strong>Tech</strong> — technology and software projects.</li>
+    <li><strong>Business</strong> — commercial and operational projects.</li>
+    <li><strong>Marketing</strong> — brand, content, and growth projects.</li>
+    <li><strong>Science</strong> — research and data-driven projects.</li>
+    <li><strong>Clinical</strong> — health and clinical research projects.</li>
+    <li><strong>Design</strong> — UX, visual, and product design projects.</li>
+  </ul>
+
+  <h2>Task Priority Colours</h2>
+  <table>
+    <thead><tr><th>Priority</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="key" style="color:var(--red)">↑ High</td><td>Urgent tasks that should be actioned immediately.</td></tr>
+      <tr><td class="key" style="color:var(--amber)">→ Medium</td><td>Standard priority tasks.</td></tr>
+      <tr><td class="key" style="color:var(--green)">↓ Low</td><td>Tasks that can be deferred without impact.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Intern Timeline Bar Colours</h2>
+  <table>
+    <thead><tr><th>Colour</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td class="key" style="color:var(--green)">Green</td><td>1 concurrent project — healthy workload.</td></tr>
+      <tr><td class="key" style="color:var(--amber)">Amber</td><td>2 concurrent projects — monitor closely.</td></tr>
+      <tr><td class="key" style="color:var(--red)">Red</td><td>3+ concurrent projects — overloaded, consider reassignment.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Auto-fill Priority Order</h2>
+  <ul class="guide">
+    <li>Most understaffed slot filled first (lowest fill ratio).</li>
+    <li>Specialist interns preferred (single-area) over generalists.</li>
+    <li>Least busy intern selected when skills are equal.</li>
+    <li>Alphabetical as final tiebreaker.</li>
+  </ul>
+
+  <h2>Points System</h2>
+  <ul class="guide">
+    <li>10 points per breakdown step checked for the first time.</li>
+    <li>No points for unchecking or re-checking an already-checked step.</li>
+  </ul>
+
+  <footer>DRESIO Workspace &nbsp;—&nbsp; Internal User Guide &nbsp;·&nbsp; Confidential</footer>
+
+</main>
+</body>
+</html>
